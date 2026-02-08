@@ -11,6 +11,8 @@ var _busy: bool = false
 const PORT: int = 9090
 
 func _ready() -> void:
+	# Ensure MCP server keeps processing even when game is paused
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_server = TCPServer.new()
 	var err: int = _server.listen(PORT, "127.0.0.1")
 	if err != OK:
@@ -186,7 +188,7 @@ func _cmd_click(params: Dictionary) -> void:
 	var press_event: InputEventMouseButton = InputEventMouseButton.new()
 	press_event.position = pos
 	press_event.global_position = pos
-	press_event.button_index = button
+	press_event.button_index = button as MouseButton
 	press_event.pressed = true
 	Input.parse_input_event(press_event)
 
@@ -196,7 +198,7 @@ func _cmd_click(params: Dictionary) -> void:
 	var release_event: InputEventMouseButton = InputEventMouseButton.new()
 	release_event.position = pos
 	release_event.global_position = pos
-	release_event.button_index = button
+	release_event.button_index = button as MouseButton
 	release_event.pressed = false
 	Input.parse_input_event(release_event)
 
@@ -225,8 +227,8 @@ func _cmd_key_press(params: Dictionary) -> void:
 			return
 
 		var event: InputEventKey = InputEventKey.new()
-		event.keycode = keycode
-		event.physical_keycode = keycode
+		event.keycode = keycode as Key
+		event.physical_keycode = keycode as Key
 		event.pressed = pressed
 		Input.parse_input_event(event)
 
@@ -234,8 +236,8 @@ func _cmd_key_press(params: Dictionary) -> void:
 			# Auto-release after a frame
 			await get_tree().process_frame
 			var release_event: InputEventKey = InputEventKey.new()
-			release_event.keycode = keycode
-			release_event.physical_keycode = keycode
+			release_event.keycode = keycode as Key
+			release_event.physical_keycode = keycode as Key
 			release_event.pressed = false
 			Input.parse_input_event(release_event)
 
@@ -363,8 +365,6 @@ func _cmd_eval(params: Dictionary) -> void:
 
 	# Wrap user code in a function so we can capture the return value
 	var script_source: String = """extends Node
-
-var __error: String = ""
 
 func execute():
 	var __result = null
@@ -583,7 +583,7 @@ func _cmd_pause(params: Dictionary) -> void:
 
 
 # --- Get Performance ---
-func _cmd_get_performance(params: Dictionary) -> void:
+func _cmd_get_performance(_params: Dictionary) -> void:
 	_send_response({
 		"success": true,
 		"fps": Performance.get_monitor(Performance.TIME_FPS),
