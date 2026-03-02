@@ -1072,7 +1072,7 @@ class GodotServer {
               },
               pressed: {
                 type: 'boolean',
-                description: 'Whether to press (true) or release (false). Default: true (press and auto-release)',
+                description: 'Press (true) or release (false). Default: true (auto-release)',
               },
             },
             required: [],
@@ -1169,7 +1169,7 @@ class GodotServer {
                 description: 'Property name to set',
               },
               value: {
-                description: 'Value to set. Use objects for complex types: {x,y} for Vector2, {x,y,z} for Vector3, {r,g,b,a} for Color',
+                description: 'Value to set. Use objects for vectors/colors',
               },
               typeHint: {
                 type: 'string',
