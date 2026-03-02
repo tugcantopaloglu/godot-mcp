@@ -177,6 +177,20 @@ func _handle_command(json_str: String) -> void:
 			_cmd_get_audio()
 		"spawn_node":
 			_cmd_spawn_node(params)
+		"set_shader_param":
+			_cmd_set_shader_param(params)
+		"audio_play":
+			_cmd_audio_play(params)
+		"audio_bus":
+			_cmd_audio_bus(params)
+		"navigate_path":
+			await _cmd_navigate_path(params)
+		"tilemap":
+			_cmd_tilemap(params)
+		"add_collision":
+			_cmd_add_collision(params)
+		"environment":
+			_cmd_environment(params)
 		_:
 			_send_response({"error": "Unknown command: %s" % command})
 
@@ -1435,6 +1449,415 @@ func _cmd_spawn_node(params: Dictionary) -> void:
 
 	parent.add_child(instance)
 	_send_response({"success": true, "name": instance.name, "type": type_name, "path": str(instance.get_path())})
+
+
+# --- Set Shader Parameter ---
+func _cmd_set_shader_param(params: Dictionary) -> void:
+	var node_path: String = params.get("node_path", "")
+	var param_name: String = params.get("param_name", "")
+	if node_path.is_empty() or param_name.is_empty():
+		_send_response({"error": "node_path and param_name are required"})
+		return
+
+	var node: Node = get_tree().root.get_node_or_null(node_path)
+	if node == null:
+		_send_response({"error": "Node not found: %s" % node_path})
+		return
+
+	var material: Material = null
+	# Try material_override first (MeshInstance3D/2D)
+	if node.get("material_override") != null:
+		material = node.get("material_override")
+	# Try surface override material (MeshInstance3D)
+	elif node.has_method("get_surface_override_material"):
+		material = node.get_surface_override_material(0)
+	# Try material property (CanvasItem, e.g. Sprite2D)
+	elif node.get("material") != null:
+		material = node.get("material")
+
+	if material == null or not material is ShaderMaterial:
+		_send_response({"error": "No ShaderMaterial found on node: %s" % node_path})
+		return
+
+	var shader_mat: ShaderMaterial = material as ShaderMaterial
+	var raw_value: Variant = params.get("value", null)
+	var type_hint: String = params.get("type_hint", "")
+	var value: Variant = _json_to_variant(raw_value, type_hint)
+	shader_mat.set_shader_parameter(param_name, value)
+	_send_response({"success": true, "node_path": node_path, "param_name": param_name, "value": _variant_to_json(shader_mat.get_shader_parameter(param_name))})
+
+
+# --- Audio Play ---
+func _cmd_audio_play(params: Dictionary) -> void:
+	var node_path: String = params.get("node_path", "")
+	var action: String = params.get("action", "play")
+	if node_path.is_empty():
+		_send_response({"error": "node_path is required"})
+		return
+
+	var node: Node = get_tree().root.get_node_or_null(node_path)
+	if node == null:
+		_send_response({"error": "Node not found: %s" % node_path})
+		return
+
+	if not (node is AudioStreamPlayer or node is AudioStreamPlayer2D or node is AudioStreamPlayer3D):
+		_send_response({"error": "Node is not an AudioStreamPlayer: %s (is %s)" % [node_path, node.get_class()]})
+		return
+
+	# Optionally load a new stream
+	if params.has("stream"):
+		var stream_path: String = params["stream"]
+		var stream: AudioStream = load(stream_path) as AudioStream
+		if stream == null:
+			_send_response({"error": "Failed to load audio stream: %s" % stream_path})
+			return
+		node.set("stream", stream)
+
+	# Set optional properties
+	if params.has("volume"):
+		var linear_vol: float = float(params["volume"])
+		node.set("volume_db", linear_to_db(clampf(linear_vol, 0.0, 1.0)))
+	if params.has("pitch"):
+		node.set("pitch_scale", float(params["pitch"]))
+	if params.has("bus"):
+		node.set("bus", params["bus"])
+
+	match action:
+		"play":
+			var from_pos: float = float(params.get("from_position", 0.0))
+			node.call("play", from_pos)
+			_send_response({"success": true, "action": "play", "node_path": node_path})
+		"stop":
+			node.call("stop")
+			_send_response({"success": true, "action": "stop", "node_path": node_path})
+		"pause":
+			node.set("stream_paused", true)
+			_send_response({"success": true, "action": "pause", "node_path": node_path})
+		"resume":
+			node.set("stream_paused", false)
+			_send_response({"success": true, "action": "resume", "node_path": node_path})
+		_:
+			_send_response({"error": "Unknown audio action: %s. Use play, stop, pause, or resume" % action})
+
+
+# --- Audio Bus ---
+func _cmd_audio_bus(params: Dictionary) -> void:
+	var bus_name: String = params.get("bus_name", "Master")
+	var bus_idx: int = AudioServer.get_bus_index(bus_name)
+	if bus_idx == -1:
+		_send_response({"error": "Audio bus not found: %s" % bus_name})
+		return
+
+	if params.has("volume"):
+		var linear_vol: float = float(params["volume"])
+		AudioServer.set_bus_volume_db(bus_idx, linear_to_db(clampf(linear_vol, 0.0, 1.0)))
+	if params.has("mute"):
+		AudioServer.set_bus_mute(bus_idx, bool(params["mute"]))
+	if params.has("solo"):
+		AudioServer.set_bus_solo(bus_idx, bool(params["solo"]))
+
+	_send_response({
+		"success": true,
+		"bus_name": bus_name,
+		"volume_db": AudioServer.get_bus_volume_db(bus_idx),
+		"mute": AudioServer.is_bus_mute(bus_idx),
+		"solo": AudioServer.is_bus_solo(bus_idx)
+	})
+
+
+# --- Navigate Path ---
+func _cmd_navigate_path(params: Dictionary) -> void:
+	var start_dict: Dictionary = params.get("start", {})
+	var end_dict: Dictionary = params.get("end", {})
+	var optimize: bool = params.get("optimize", true)
+
+	if start_dict.is_empty() or end_dict.is_empty():
+		_send_response({"error": "start and end are required"})
+		return
+
+	# Wait a frame to ensure navigation map is ready
+	await get_tree().process_frame
+
+	var is_3d: bool = start_dict.has("z") or end_dict.has("z")
+
+	if is_3d:
+		var start_pos: Vector3 = Vector3(float(start_dict.get("x", 0)), float(start_dict.get("y", 0)), float(start_dict.get("z", 0)))
+		var end_pos: Vector3 = Vector3(float(end_dict.get("x", 0)), float(end_dict.get("y", 0)), float(end_dict.get("z", 0)))
+		var map_rid: RID = get_tree().root.get_world_3d().get_navigation_map()
+		var path: PackedVector3Array = NavigationServer3D.map_get_path(map_rid, start_pos, end_pos, optimize)
+		var total_length: float = 0.0
+		for i in range(1, path.size()):
+			total_length += path[i - 1].distance_to(path[i])
+		_send_response({"success": true, "mode": "3d", "path": _variant_to_json(path), "point_count": path.size(), "total_length": total_length})
+	else:
+		var start_pos: Vector2 = Vector2(float(start_dict.get("x", 0)), float(start_dict.get("y", 0)))
+		var end_pos: Vector2 = Vector2(float(end_dict.get("x", 0)), float(end_dict.get("y", 0)))
+		var map_rid: RID = get_tree().root.get_world_2d().get_navigation_map()
+		var path: PackedVector2Array = NavigationServer2D.map_get_path(map_rid, start_pos, end_pos, optimize)
+		var total_length: float = 0.0
+		for i in range(1, path.size()):
+			total_length += path[i - 1].distance_to(path[i])
+		_send_response({"success": true, "mode": "2d", "path": _variant_to_json(path), "point_count": path.size(), "total_length": total_length})
+
+
+# --- TileMap ---
+func _cmd_tilemap(params: Dictionary) -> void:
+	var node_path: String = params.get("node_path", "")
+	var action: String = params.get("action", "get_cell")
+	if node_path.is_empty():
+		_send_response({"error": "node_path is required"})
+		return
+
+	var node: Node = get_tree().root.get_node_or_null(node_path)
+	if node == null:
+		_send_response({"error": "Node not found: %s" % node_path})
+		return
+
+	if not node is TileMapLayer:
+		_send_response({"error": "Node is not a TileMapLayer: %s (is %s)" % [node_path, node.get_class()]})
+		return
+
+	var tilemap: TileMapLayer = node as TileMapLayer
+
+	match action:
+		"set_cells":
+			var cells: Array = params.get("cells", [])
+			var count: int = 0
+			for cell in cells:
+				var pos: Vector2i = Vector2i(int(cell.get("x", 0)), int(cell.get("y", 0)))
+				var source_id: int = int(cell.get("source_id", 0))
+				var atlas_coords: Vector2i = Vector2i(int(cell.get("atlas_x", 0)), int(cell.get("atlas_y", 0)))
+				var alt_tile: int = int(cell.get("alt_tile", 0))
+				tilemap.set_cell(pos, source_id, atlas_coords, alt_tile)
+				count += 1
+			_send_response({"success": true, "action": "set_cells", "count": count})
+		"get_cell":
+			var x: int = int(params.get("x", 0))
+			var y: int = int(params.get("y", 0))
+			var pos: Vector2i = Vector2i(x, y)
+			_send_response({
+				"success": true, "action": "get_cell",
+				"x": x, "y": y,
+				"source_id": tilemap.get_cell_source_id(pos),
+				"atlas_coords": _variant_to_json(tilemap.get_cell_atlas_coords(pos)),
+				"alt_tile": tilemap.get_cell_alternative_tile(pos)
+			})
+		"erase_cells":
+			var cells: Array = params.get("cells", [])
+			var count: int = 0
+			for cell in cells:
+				tilemap.erase_cell(Vector2i(int(cell.get("x", 0)), int(cell.get("y", 0))))
+				count += 1
+			_send_response({"success": true, "action": "erase_cells", "count": count})
+		"get_used_cells":
+			var source_filter: int = int(params.get("source_id", -1))
+			var used: Array
+			if source_filter >= 0:
+				used = tilemap.get_used_cells_by_id(source_filter)
+			else:
+				used = tilemap.get_used_cells()
+			_send_response({"success": true, "action": "get_used_cells", "cells": _variant_to_json(used), "count": used.size()})
+		_:
+			_send_response({"error": "Unknown tilemap action: %s. Use set_cells, get_cell, erase_cells, or get_used_cells" % action})
+
+
+# --- Add Collision Shape ---
+func _cmd_add_collision(params: Dictionary) -> void:
+	var parent_path: String = params.get("parent_path", "")
+	var shape_type: String = params.get("shape_type", "")
+	if parent_path.is_empty() or shape_type.is_empty():
+		_send_response({"error": "parent_path and shape_type are required"})
+		return
+
+	var parent: Node = get_tree().root.get_node_or_null(parent_path)
+	if parent == null:
+		_send_response({"error": "Parent node not found: %s" % parent_path})
+		return
+
+	var is_3d: bool = parent.get_class().ends_with("3D") or parent is PhysicsBody3D or parent is Area3D
+	var shape_params: Dictionary = params.get("shape_params", {})
+	var shape: Resource = null
+
+	if is_3d:
+		match shape_type:
+			"box":
+				var s: BoxShape3D = BoxShape3D.new()
+				s.size = Vector3(float(shape_params.get("size_x", 1)), float(shape_params.get("size_y", 1)), float(shape_params.get("size_z", 1)))
+				shape = s
+			"sphere":
+				var s: SphereShape3D = SphereShape3D.new()
+				s.radius = float(shape_params.get("radius", 0.5))
+				shape = s
+			"capsule":
+				var s: CapsuleShape3D = CapsuleShape3D.new()
+				s.radius = float(shape_params.get("radius", 0.5))
+				s.height = float(shape_params.get("height", 2.0))
+				shape = s
+			"cylinder":
+				var s: CylinderShape3D = CylinderShape3D.new()
+				s.radius = float(shape_params.get("radius", 0.5))
+				s.height = float(shape_params.get("height", 2.0))
+				shape = s
+			"ray":
+				var s: SeparationRayShape3D = SeparationRayShape3D.new()
+				s.length = float(shape_params.get("length", 1.0))
+				shape = s
+			_:
+				_send_response({"error": "Unknown 3D shape type: %s. Use box, sphere, capsule, cylinder, or ray" % shape_type})
+				return
+		var col_shape: CollisionShape3D = CollisionShape3D.new()
+		col_shape.shape = shape as Shape3D
+		if params.has("disabled"):
+			col_shape.disabled = bool(params["disabled"])
+		parent.add_child(col_shape)
+		col_shape.owner = get_tree().edited_scene_root if get_tree().edited_scene_root else get_tree().root
+		if params.has("collision_layer"):
+			parent.set("collision_layer", int(params["collision_layer"]))
+		if params.has("collision_mask"):
+			parent.set("collision_mask", int(params["collision_mask"]))
+		_send_response({"success": true, "name": col_shape.name, "path": str(col_shape.get_path()), "shape_type": shape_type, "mode": "3d"})
+	else:
+		match shape_type:
+			"box":
+				var s: RectangleShape2D = RectangleShape2D.new()
+				s.size = Vector2(float(shape_params.get("size_x", 1)), float(shape_params.get("size_y", 1)))
+				shape = s
+			"circle":
+				var s: CircleShape2D = CircleShape2D.new()
+				s.radius = float(shape_params.get("radius", 0.5))
+				shape = s
+			"capsule":
+				var s: CapsuleShape2D = CapsuleShape2D.new()
+				s.radius = float(shape_params.get("radius", 0.5))
+				s.height = float(shape_params.get("height", 2.0))
+				shape = s
+			"segment":
+				var s: SegmentShape2D = SegmentShape2D.new()
+				s.a = Vector2(float(shape_params.get("a_x", 0)), float(shape_params.get("a_y", 0)))
+				s.b = Vector2(float(shape_params.get("b_x", 1)), float(shape_params.get("b_y", 0)))
+				shape = s
+			_:
+				_send_response({"error": "Unknown 2D shape type: %s. Use box, circle, capsule, or segment" % shape_type})
+				return
+		var col_shape: CollisionShape2D = CollisionShape2D.new()
+		col_shape.shape = shape as Shape2D
+		if params.has("disabled"):
+			col_shape.disabled = bool(params["disabled"])
+		parent.add_child(col_shape)
+		col_shape.owner = get_tree().edited_scene_root if get_tree().edited_scene_root else get_tree().root
+		if params.has("collision_layer"):
+			parent.set("collision_layer", int(params["collision_layer"]))
+		if params.has("collision_mask"):
+			parent.set("collision_mask", int(params["collision_mask"]))
+		_send_response({"success": true, "name": col_shape.name, "path": str(col_shape.get_path()), "shape_type": shape_type, "mode": "2d"})
+
+
+# --- Environment / Post-Processing ---
+func _cmd_environment(params: Dictionary) -> void:
+	var action: String = params.get("action", "set")
+
+	# Find existing WorldEnvironment or Camera3D environment
+	var env: Environment = null
+	var world_env: Node = null
+
+	# Search for WorldEnvironment node
+	var found: Array = []
+	_find_by_class_recursive(get_tree().root, "WorldEnvironment", found)
+	if found.size() > 0:
+		world_env = get_tree().root.get_node_or_null(found[0]["path"])
+		if world_env != null:
+			env = world_env.get("environment") as Environment
+
+	# Fallback: check Camera3D
+	if env == null:
+		var cam3d: Camera3D = get_viewport().get_camera_3d()
+		if cam3d != null and cam3d.get("environment") != null:
+			env = cam3d.get("environment") as Environment
+
+	if action == "get":
+		if env == null:
+			_send_response({"error": "No Environment resource found"})
+			return
+		_send_response(_get_environment_state(env))
+		return
+
+	# action == "set": create if needed
+	if env == null:
+		env = Environment.new()
+		var we: WorldEnvironment = WorldEnvironment.new()
+		we.environment = env
+		get_tree().root.add_child(we)
+		world_env = we
+
+	# Apply settings
+	if params.has("background_mode"):
+		env.background_mode = int(params["background_mode"]) as Environment.BGMode
+	if params.has("background_color"):
+		var c: Dictionary = params["background_color"]
+		env.background_color = Color(float(c.get("r", 0)), float(c.get("g", 0)), float(c.get("b", 0)), float(c.get("a", 1)))
+	if params.has("ambient_light_color"):
+		var c: Dictionary = params["ambient_light_color"]
+		env.ambient_light_color = Color(float(c.get("r", 0)), float(c.get("g", 0)), float(c.get("b", 0)), float(c.get("a", 1)))
+	if params.has("ambient_light_energy"):
+		env.ambient_light_energy = float(params["ambient_light_energy"])
+	if params.has("fog_enabled"):
+		env.fog_enabled = bool(params["fog_enabled"])
+	if params.has("fog_density"):
+		env.fog_density = float(params["fog_density"])
+	if params.has("fog_light_color"):
+		var c: Dictionary = params["fog_light_color"]
+		env.fog_light_color = Color(float(c.get("r", 0)), float(c.get("g", 0)), float(c.get("b", 0)), float(c.get("a", 1)))
+	if params.has("glow_enabled"):
+		env.glow_enabled = bool(params["glow_enabled"])
+	if params.has("glow_intensity"):
+		env.glow_intensity = float(params["glow_intensity"])
+	if params.has("glow_bloom"):
+		env.glow_bloom = float(params["glow_bloom"])
+	if params.has("tonemap_mode"):
+		env.tonemap_mode = int(params["tonemap_mode"]) as Environment.ToneMapper
+	if params.has("ssao_enabled"):
+		env.ssao_enabled = bool(params["ssao_enabled"])
+	if params.has("ssao_radius"):
+		env.ssao_radius = float(params["ssao_radius"])
+	if params.has("ssao_intensity"):
+		env.ssao_intensity = float(params["ssao_intensity"])
+	if params.has("ssr_enabled"):
+		env.ssr_enabled = bool(params["ssr_enabled"])
+	if params.has("brightness"):
+		env.adjustment_enabled = true
+		env.adjustment_brightness = float(params["brightness"])
+	if params.has("contrast"):
+		env.adjustment_enabled = true
+		env.adjustment_contrast = float(params["contrast"])
+	if params.has("saturation"):
+		env.adjustment_enabled = true
+		env.adjustment_saturation = float(params["saturation"])
+
+	_send_response(_get_environment_state(env))
+
+
+func _get_environment_state(env: Environment) -> Dictionary:
+	return {
+		"success": true,
+		"background_mode": env.background_mode,
+		"background_color": _variant_to_json(env.background_color),
+		"ambient_light_color": _variant_to_json(env.ambient_light_color),
+		"ambient_light_energy": env.ambient_light_energy,
+		"fog_enabled": env.fog_enabled,
+		"fog_density": env.fog_density,
+		"fog_light_color": _variant_to_json(env.fog_light_color),
+		"glow_enabled": env.glow_enabled,
+		"glow_intensity": env.glow_intensity,
+		"glow_bloom": env.glow_bloom,
+		"tonemap_mode": env.tonemap_mode,
+		"ssao_enabled": env.ssao_enabled,
+		"ssao_radius": env.ssao_radius,
+		"ssao_intensity": env.ssao_intensity,
+		"ssr_enabled": env.ssr_enabled,
+		"brightness": env.adjustment_brightness,
+		"contrast": env.adjustment_contrast,
+		"saturation": env.adjustment_saturation
+	}
 
 
 func _exit_tree() -> void:

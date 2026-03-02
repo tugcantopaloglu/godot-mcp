@@ -1818,6 +1818,126 @@ class GodotServer {
             required: ['type'],
           },
         },
+        // Shader, audio, navigation, tilemap, collision, environment tools
+        {
+          name: 'game_set_shader_param',
+          description: 'Set a shader parameter on a node\'s material',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              nodePath: { type: 'string', description: 'Path to the node with a ShaderMaterial' },
+              paramName: { type: 'string', description: 'Shader parameter name' },
+              value: { description: 'Value to set (number, object, array, etc.)' },
+              typeHint: { type: 'string', description: 'Optional type hint (e.g. "Color", "Vector2")' },
+            },
+            required: ['nodePath', 'paramName', 'value'],
+          },
+        },
+        {
+          name: 'game_audio_play',
+          description: 'Play, stop, or pause an AudioStreamPlayer node',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              nodePath: { type: 'string', description: 'Path to AudioStreamPlayer/2D/3D node' },
+              action: { type: 'string', description: 'Action: play, stop, pause, resume' },
+              stream: { type: 'string', description: 'Optional res:// path to load a new stream' },
+              volume: { type: 'number', description: 'Volume (linear 0-1)' },
+              pitch: { type: 'number', description: 'Pitch scale' },
+              bus: { type: 'string', description: 'Audio bus name' },
+              fromPosition: { type: 'number', description: 'Start position in seconds' },
+            },
+            required: ['nodePath'],
+          },
+        },
+        {
+          name: 'game_audio_bus',
+          description: 'Set volume, mute, or solo on an audio bus',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              busName: { type: 'string', description: 'Bus name. Default: "Master"' },
+              volume: { type: 'number', description: 'Volume (linear 0-1)' },
+              mute: { type: 'boolean', description: 'Mute the bus' },
+              solo: { type: 'boolean', description: 'Solo the bus' },
+            },
+            required: [],
+          },
+        },
+        {
+          name: 'game_navigate_path',
+          description: 'Query a navigation path between two points',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              start: { type: 'object', description: 'Start point {x,y} or {x,y,z}' },
+              end: { type: 'object', description: 'End point {x,y} or {x,y,z}' },
+              optimize: { type: 'boolean', description: 'Use string-pulling optimization. Default: true' },
+            },
+            required: ['start', 'end'],
+          },
+        },
+        {
+          name: 'game_tilemap',
+          description: 'Get or set cells in a TileMapLayer node',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              nodePath: { type: 'string', description: 'Path to TileMapLayer node' },
+              action: { type: 'string', description: 'Action: set_cells, get_cell, erase_cells, get_used_cells' },
+              x: { type: 'number', description: 'Cell X coordinate (for get_cell)' },
+              y: { type: 'number', description: 'Cell Y coordinate (for get_cell)' },
+              cells: { type: 'array', description: 'Array of cell objects for set_cells/erase_cells' },
+              sourceId: { type: 'number', description: 'Filter by source_id (for get_used_cells)' },
+            },
+            required: ['nodePath', 'action'],
+          },
+        },
+        {
+          name: 'game_add_collision',
+          description: 'Add a collision shape to a physics body node',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              parentPath: { type: 'string', description: 'Path to CollisionBody/Area node' },
+              shapeType: { type: 'string', description: 'Shape: box, sphere/circle, capsule, cylinder, ray, segment' },
+              shapeParams: { type: 'object', description: 'Shape dimensions (e.g. {radius, height})' },
+              collisionLayer: { type: 'number', description: 'Collision layer bitmask' },
+              collisionMask: { type: 'number', description: 'Collision mask bitmask' },
+              disabled: { type: 'boolean', description: 'Start disabled' },
+            },
+            required: ['parentPath', 'shapeType'],
+          },
+        },
+        {
+          name: 'game_environment',
+          description: 'Get or set environment and post-processing settings',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              action: { type: 'string', description: 'Action: get or set. Default: set' },
+              backgroundMode: { type: 'number', description: '0=clear, 1=custom_color, 2=sky, 3=canvas' },
+              backgroundColor: { type: 'object', description: 'Background color {r,g,b,a}' },
+              ambientLightColor: { type: 'object', description: 'Ambient light color {r,g,b,a}' },
+              ambientLightEnergy: { type: 'number', description: 'Ambient light energy' },
+              fogEnabled: { type: 'boolean', description: 'Enable fog' },
+              fogDensity: { type: 'number', description: 'Fog density' },
+              fogLightColor: { type: 'object', description: 'Fog light color {r,g,b,a}' },
+              glowEnabled: { type: 'boolean', description: 'Enable glow' },
+              glowIntensity: { type: 'number', description: 'Glow intensity' },
+              glowBloom: { type: 'number', description: 'Glow bloom' },
+              tonemapMode: { type: 'number', description: '0=linear, 1=reinhardt, 2=filmic, 3=aces' },
+              ssaoEnabled: { type: 'boolean', description: 'Enable SSAO' },
+              ssaoRadius: { type: 'number', description: 'SSAO radius' },
+              ssaoIntensity: { type: 'number', description: 'SSAO intensity' },
+              ssrEnabled: { type: 'boolean', description: 'Enable SSR' },
+              brightness: { type: 'number', description: 'Brightness adjustment' },
+              contrast: { type: 'number', description: 'Contrast adjustment' },
+              saturation: { type: 'number', description: 'Saturation adjustment' },
+            },
+            required: [],
+          },
+        },
       ],
     }));
 
@@ -1969,6 +2089,21 @@ class GodotServer {
           return await this.handleGameGetAudio();
         case 'game_spawn_node':
           return await this.handleGameSpawnNode(request.params.arguments);
+        // Shader, audio, navigation, tilemap, collision, environment tools
+        case 'game_set_shader_param':
+          return await this.handleGameSetShaderParam(request.params.arguments);
+        case 'game_audio_play':
+          return await this.handleGameAudioPlay(request.params.arguments);
+        case 'game_audio_bus':
+          return await this.handleGameAudioBus(request.params.arguments);
+        case 'game_navigate_path':
+          return await this.handleGameNavigatePath(request.params.arguments);
+        case 'game_tilemap':
+          return await this.handleGameTilemap(request.params.arguments);
+        case 'game_add_collision':
+          return await this.handleGameAddCollision(request.params.arguments);
+        case 'game_environment':
+          return await this.handleGameEnvironment(request.params.arguments);
         default:
           throw new McpError(
             ErrorCode.MethodNotFound,
@@ -3738,6 +3873,104 @@ class GodotServer {
       type: a.type, name: a.name || '', parent_path: a.parentPath || '/root',
       ...(a.properties ? { properties: a.properties } : {}),
     }));
+  }
+
+  private async handleGameSetShaderParam(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.nodePath || !args.paramName)
+      return createErrorResponse('nodePath and paramName are required.');
+    return this.gameCommand('set_shader_param', args, a => ({
+      node_path: a.nodePath, param_name: a.paramName, value: a.value,
+      ...(a.typeHint ? { type_hint: a.typeHint } : {}),
+    }));
+  }
+
+  private async handleGameAudioPlay(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.nodePath)
+      return createErrorResponse('nodePath is required.');
+    return this.gameCommand('audio_play', args, a => ({
+      node_path: a.nodePath, action: a.action || 'play',
+      ...(a.stream ? { stream: a.stream } : {}),
+      ...(a.volume !== undefined ? { volume: a.volume } : {}),
+      ...(a.pitch !== undefined ? { pitch: a.pitch } : {}),
+      ...(a.bus ? { bus: a.bus } : {}),
+      ...(a.fromPosition !== undefined ? { from_position: a.fromPosition } : {}),
+    }));
+  }
+
+  private async handleGameAudioBus(args: any) {
+    return this.gameCommand('audio_bus', args, a => ({
+      bus_name: a.busName || 'Master',
+      ...(a.volume !== undefined ? { volume: a.volume } : {}),
+      ...(a.mute !== undefined ? { mute: a.mute } : {}),
+      ...(a.solo !== undefined ? { solo: a.solo } : {}),
+    }));
+  }
+
+  private async handleGameNavigatePath(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.start || !args.end)
+      return createErrorResponse('start and end are required.');
+    return this.gameCommand('navigate_path', args, a => ({
+      start: a.start, end: a.end, optimize: a.optimize ?? true,
+    }));
+  }
+
+  private async handleGameTilemap(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.nodePath)
+      return createErrorResponse('nodePath is required.');
+    if (!args.action)
+      return createErrorResponse('action is required.');
+    return this.gameCommand('tilemap', args, a => ({
+      node_path: a.nodePath, action: a.action,
+      ...(a.x !== undefined ? { x: a.x } : {}),
+      ...(a.y !== undefined ? { y: a.y } : {}),
+      ...(a.cells ? { cells: a.cells } : {}),
+      ...(a.sourceId !== undefined ? { source_id: a.sourceId } : {}),
+    }));
+  }
+
+  private async handleGameAddCollision(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.parentPath || !args.shapeType)
+      return createErrorResponse('parentPath and shapeType are required.');
+    return this.gameCommand('add_collision', args, a => ({
+      parent_path: a.parentPath, shape_type: a.shapeType,
+      ...(a.shapeParams ? { shape_params: a.shapeParams } : {}),
+      ...(a.collisionLayer !== undefined ? { collision_layer: a.collisionLayer } : {}),
+      ...(a.collisionMask !== undefined ? { collision_mask: a.collisionMask } : {}),
+      ...(a.disabled !== undefined ? { disabled: a.disabled } : {}),
+    }));
+  }
+
+  private async handleGameEnvironment(args: any) {
+    args = normalizeParameters(args || {});
+    const params: Record<string, any> = { action: args.action || 'set' };
+    // Pass through all environment settings
+    const envKeys = [
+      'backgroundMode', 'backgroundColor', 'ambientLightColor', 'ambientLightEnergy',
+      'fogEnabled', 'fogDensity', 'fogLightColor',
+      'glowEnabled', 'glowIntensity', 'glowBloom',
+      'tonemapMode', 'ssaoEnabled', 'ssaoRadius', 'ssaoIntensity', 'ssrEnabled',
+      'brightness', 'contrast', 'saturation',
+    ];
+    const snakeMap: Record<string, string> = {
+      backgroundMode: 'background_mode', backgroundColor: 'background_color',
+      ambientLightColor: 'ambient_light_color', ambientLightEnergy: 'ambient_light_energy',
+      fogEnabled: 'fog_enabled', fogDensity: 'fog_density', fogLightColor: 'fog_light_color',
+      glowEnabled: 'glow_enabled', glowIntensity: 'glow_intensity', glowBloom: 'glow_bloom',
+      tonemapMode: 'tonemap_mode', ssaoEnabled: 'ssao_enabled', ssaoRadius: 'ssao_radius',
+      ssaoIntensity: 'ssao_intensity', ssrEnabled: 'ssr_enabled',
+      brightness: 'brightness', contrast: 'contrast', saturation: 'saturation',
+    };
+    for (const key of envKeys) {
+      if (args[key] !== undefined) {
+        params[snakeMap[key]] = args[key];
+      }
+    }
+    return this.gameCommand('environment', { ...args }, () => params);
   }
 
   /**

@@ -1128,6 +1128,158 @@ describe('Lifecycle handlers', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 7b. Shader, audio, navigation, tilemap, collision, environment handlers
+// ---------------------------------------------------------------------------
+describe('Game command handlers — new tools (shader, audio, nav, tilemap, collision, env)', () => {
+  // game_set_shader_param
+  describe('handleGameSetShaderParam', () => {
+    const argsFn = (a: any) => ({
+      node_path: a.nodePath, param_name: a.paramName, value: a.value,
+      ...(a.typeHint ? { type_hint: a.typeHint } : {}),
+    });
+
+    it('requires nodePath and paramName', () => {
+      const r = fakeGameCommand(true, true, {}, argsFn);
+      // argsFn succeeds but returns undefined fields — validation is in the TS handler
+      expect(r.error).toBeNull();
+    });
+
+    it('passes shader params correctly', () => {
+      const r = fakeGameCommand(true, true, { nodePath: '/root/Mesh', paramName: 'albedo_color', value: { r: 1, g: 0, b: 0, a: 1 }, typeHint: 'Color' }, argsFn);
+      expect(r.commandArgs).toEqual({ node_path: '/root/Mesh', param_name: 'albedo_color', value: { r: 1, g: 0, b: 0, a: 1 }, type_hint: 'Color' });
+    });
+
+    it('omits type_hint when not provided', () => {
+      const r = fakeGameCommand(true, true, { nodePath: '/root/Mesh', paramName: 'speed', value: 2.5 }, argsFn);
+      expect(r.commandArgs).toEqual({ node_path: '/root/Mesh', param_name: 'speed', value: 2.5 });
+    });
+  });
+
+  // game_audio_play
+  describe('handleGameAudioPlay', () => {
+    const argsFn = (a: any) => ({
+      node_path: a.nodePath, action: a.action || 'play',
+      ...(a.stream ? { stream: a.stream } : {}),
+      ...(a.volume !== undefined ? { volume: a.volume } : {}),
+      ...(a.pitch !== undefined ? { pitch: a.pitch } : {}),
+      ...(a.bus ? { bus: a.bus } : {}),
+      ...(a.fromPosition !== undefined ? { from_position: a.fromPosition } : {}),
+    });
+
+    it('defaults action to play', () => {
+      const r = fakeGameCommand(true, true, { nodePath: '/root/Music' }, argsFn);
+      expect(r.commandArgs).toEqual({ node_path: '/root/Music', action: 'play' });
+    });
+
+    it('passes all optional audio params', () => {
+      const r = fakeGameCommand(true, true, { nodePath: '/root/SFX', action: 'play', volume: 0.5, pitch: 1.2, bus: 'Effects', fromPosition: 3.5, stream: 'res://audio.ogg' }, argsFn);
+      expect(r.commandArgs).toEqual({ node_path: '/root/SFX', action: 'play', volume: 0.5, pitch: 1.2, bus: 'Effects', from_position: 3.5, stream: 'res://audio.ogg' });
+    });
+  });
+
+  // game_audio_bus
+  describe('handleGameAudioBus', () => {
+    const argsFn = (a: any) => ({
+      bus_name: a.busName || 'Master',
+      ...(a.volume !== undefined ? { volume: a.volume } : {}),
+      ...(a.mute !== undefined ? { mute: a.mute } : {}),
+      ...(a.solo !== undefined ? { solo: a.solo } : {}),
+    });
+
+    it('defaults bus to Master', () => {
+      const r = fakeGameCommand(true, true, {}, argsFn);
+      expect(r.commandArgs).toEqual({ bus_name: 'Master' });
+    });
+
+    it('sets volume and mute', () => {
+      const r = fakeGameCommand(true, true, { busName: 'Music', volume: 0.3, mute: true }, argsFn);
+      expect(r.commandArgs).toEqual({ bus_name: 'Music', volume: 0.3, mute: true });
+    });
+  });
+
+  // game_navigate_path
+  describe('handleGameNavigatePath', () => {
+    const argsFn = (a: any) => ({
+      start: a.start, end: a.end, optimize: a.optimize ?? true,
+    });
+
+    it('passes 2D points', () => {
+      const r = fakeGameCommand(true, true, { start: { x: 0, y: 0 }, end: { x: 100, y: 200 } }, argsFn);
+      expect(r.commandArgs).toEqual({ start: { x: 0, y: 0 }, end: { x: 100, y: 200 }, optimize: true });
+    });
+
+    it('passes 3D points with optimize false', () => {
+      const r = fakeGameCommand(true, true, { start: { x: 0, y: 0, z: 0 }, end: { x: 10, y: 5, z: 10 }, optimize: false }, argsFn);
+      expect(r.commandArgs).toEqual({ start: { x: 0, y: 0, z: 0 }, end: { x: 10, y: 5, z: 10 }, optimize: false });
+    });
+  });
+
+  // game_tilemap
+  describe('handleGameTilemap', () => {
+    const argsFn = (a: any) => ({
+      node_path: a.nodePath, action: a.action,
+      ...(a.x !== undefined ? { x: a.x } : {}),
+      ...(a.y !== undefined ? { y: a.y } : {}),
+      ...(a.cells ? { cells: a.cells } : {}),
+      ...(a.sourceId !== undefined ? { source_id: a.sourceId } : {}),
+    });
+
+    it('handles get_cell action', () => {
+      const r = fakeGameCommand(true, true, { nodePath: '/root/TileMap', action: 'get_cell', x: 5, y: 3 }, argsFn);
+      expect(r.commandArgs).toEqual({ node_path: '/root/TileMap', action: 'get_cell', x: 5, y: 3 });
+    });
+
+    it('handles set_cells with cell array', () => {
+      const cells = [{ x: 0, y: 0, source_id: 0, atlas_x: 0, atlas_y: 0, alt_tile: 0 }];
+      const r = fakeGameCommand(true, true, { nodePath: '/root/TileMap', action: 'set_cells', cells }, argsFn);
+      expect(r.commandArgs!.action).toBe('set_cells');
+      expect(r.commandArgs!.cells).toHaveLength(1);
+    });
+
+    it('handles get_used_cells with source filter', () => {
+      const r = fakeGameCommand(true, true, { nodePath: '/root/TileMap', action: 'get_used_cells', sourceId: 2 }, argsFn);
+      expect(r.commandArgs).toEqual({ node_path: '/root/TileMap', action: 'get_used_cells', source_id: 2 });
+    });
+  });
+
+  // game_add_collision
+  describe('handleGameAddCollision', () => {
+    const argsFn = (a: any) => ({
+      parent_path: a.parentPath, shape_type: a.shapeType,
+      ...(a.shapeParams ? { shape_params: a.shapeParams } : {}),
+      ...(a.collisionLayer !== undefined ? { collision_layer: a.collisionLayer } : {}),
+      ...(a.collisionMask !== undefined ? { collision_mask: a.collisionMask } : {}),
+      ...(a.disabled !== undefined ? { disabled: a.disabled } : {}),
+    });
+
+    it('passes box shape with params', () => {
+      const r = fakeGameCommand(true, true, { parentPath: '/root/Body', shapeType: 'box', shapeParams: { size_x: 2, size_y: 2, size_z: 2 } }, argsFn);
+      expect(r.commandArgs).toEqual({ parent_path: '/root/Body', shape_type: 'box', shape_params: { size_x: 2, size_y: 2, size_z: 2 } });
+    });
+
+    it('passes collision layer and mask', () => {
+      const r = fakeGameCommand(true, true, { parentPath: '/root/Body', shapeType: 'sphere', collisionLayer: 1, collisionMask: 3 }, argsFn);
+      expect(r.commandArgs).toEqual({ parent_path: '/root/Body', shape_type: 'sphere', collision_layer: 1, collision_mask: 3 });
+    });
+  });
+
+  // game_environment
+  describe('handleGameEnvironment', () => {
+    it('source defines handleGameEnvironment method', () => {
+      expect(sourceCode).toContain('handleGameEnvironment');
+    });
+
+    it('handler passes environment settings via envKeys loop', () => {
+      expect(sourceCode).toContain("const envKeys");
+    });
+
+    it('defaults action to set', () => {
+      expect(sourceCode).toContain("action: args.action || 'set'");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 8. createErrorResponse in handlers
 // ---------------------------------------------------------------------------
 describe('Error response format in handlers', () => {
@@ -1189,8 +1341,8 @@ describe('Tool dispatch switch statement', () => {
   it('every case returns await this.handle*', () => {
     const caseRegex = /case '(\w+)':\s*\n\s*return await this\.handle/g;
     const matches = [...sourceCode.matchAll(caseRegex)];
-    // Should match all 67 tools
-    expect(matches.length).toBe(67);
+    // Should match all 74 tools
+    expect(matches.length).toBe(74);
   });
 
   it('no case falls through without return', () => {

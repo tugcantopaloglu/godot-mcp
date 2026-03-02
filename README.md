@@ -8,7 +8,7 @@
 [![](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white 'TypeScript')](https://www.typescriptlang.org/)
 [![](https://img.shields.io/badge/License-MIT-red.svg 'MIT License')](https://opensource.org/licenses/MIT)
 
-A comprehensive [Model Context Protocol](https://modelcontextprotocol.io/introduction) (MCP) server that gives AI assistants **full control** over the Godot game engine. **67 tools** spanning file I/O, runtime code execution, property inspection, scene manipulation, animation control, signal management, tweening, project creation, camera control, physics raycasting, and more.
+A comprehensive [Model Context Protocol](https://modelcontextprotocol.io/introduction) (MCP) server that gives AI assistants **full control** over the Godot game engine. **74 tools** spanning file I/O, runtime code execution, property inspection, scene manipulation, animation control, signal management, tweening, project creation, camera control, physics raycasting, and more.
 
 ## Acknowledgments
 
@@ -16,7 +16,7 @@ This project is built upon and extends [godot-mcp](https://github.com/Coding-Sol
 
 ## What's New (Improvements Over Original)
 
-The original godot-mcp provided 20 tools for basic project management and scene creation. This fork extends it to **67 tools** with the following major additions:
+The original godot-mcp provided 20 tools for basic project management and scene creation. This fork extends it to **74 tools** with the following major additions:
 
 ### Runtime Code Execution
 - **`game_eval`** - Execute arbitrary GDScript code in the running game with return values
@@ -85,6 +85,12 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 - **`game_raycast`** - Cast physics rays (auto-detects 2D vs 3D)
 - **`game_get_audio`** - Get audio bus layout and playing streams
 - **`game_spawn_node`** - Create any node type at runtime with properties
+- **`game_set_shader_param`** - Set shader parameters on materials
+- **`game_audio_play`** / **`game_audio_bus`** - Full audio playback and bus control
+- **`game_navigate_path`** - Query navigation paths (2D/3D)
+- **`game_tilemap`** - Get/set TileMapLayer cells
+- **`game_add_collision`** - Add collision shapes to physics bodies
+- **`game_environment`** - Configure post-processing (fog, glow, SSAO, tonemap, etc.)
 
 ### Robustness Improvements
 - **Reentrancy guard** - Prevents concurrent command processing during async operations
@@ -93,7 +99,7 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 - **PackedArray serialization** - Proper JSON arrays instead of string fallback
 - **Graceful error handling** - Scene read fallback to raw .tscn text on missing dependencies
 
-## All 67 Tools
+## All 74 Tools
 
 ### Project Management (7 tools)
 | Tool | Description |
@@ -217,7 +223,7 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `manage_input_map` | Add, remove, or list input actions |
 | `manage_export_presets` | Create or modify export presets |
 
-### Advanced Runtime (5 tools)
+### Advanced Runtime (12 tools)
 | Tool | Description |
 |------|-------------|
 | `game_get_camera` | Get active camera position/rotation/zoom |
@@ -225,6 +231,13 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `game_raycast` | Cast a ray and return collision results |
 | `game_get_audio` | Get audio bus layout and playing streams |
 | `game_spawn_node` | Create a new node of any type at runtime |
+| `game_set_shader_param` | Set a shader parameter on a node's material |
+| `game_audio_play` | Play, stop, or pause an AudioStreamPlayer node |
+| `game_audio_bus` | Set volume, mute, or solo on an audio bus |
+| `game_navigate_path` | Query a navigation path between two points |
+| `game_tilemap` | Get or set cells in a TileMapLayer node |
+| `game_add_collision` | Add a collision shape to a physics body node |
+| `game_environment` | Get or set environment and post-processing settings |
 
 ## Requirements
 
@@ -335,7 +348,7 @@ The project uses [Vitest](https://vitest.dev/) with 246 tests across 3 files:
 | File | Tests | What it covers |
 |------|-------|----------------|
 | `tests/utils.test.ts` | 31 | Parameter mappings, normalization, path validation, error responses, version detection |
-| `tests/tool-definitions.test.ts` | 75 | All 67 tools defined, schemas valid, names unique, descriptions < 80 chars |
+| `tests/tool-definitions.test.ts` | 75 | All 74 tools defined, schemas valid, names unique, descriptions < 80 chars |
 | `tests/handlers.test.ts` | 140 | Game command arg transforms, required-param validation, headless op path checks, source structure |
 
 ```bash

@@ -30,6 +30,9 @@ const ALL_TOOL_NAMES = [
   'create_project', 'manage_autoloads', 'manage_input_map', 'manage_export_presets',
   // Advanced runtime tools
   'game_get_camera', 'game_set_camera', 'game_raycast', 'game_get_audio', 'game_spawn_node',
+  // Shader, audio, navigation, tilemap, collision, environment tools
+  'game_set_shader_param', 'game_audio_play', 'game_audio_bus', 'game_navigate_path',
+  'game_tilemap', 'game_add_collision', 'game_environment',
 ];
 
 let sourceCode: string;
@@ -39,8 +42,8 @@ beforeAll(() => {
 });
 
 describe('Tool definitions', () => {
-  it('defines exactly 67 tools', () => {
-    expect(ALL_TOOL_NAMES).toHaveLength(67);
+  it('defines exactly 74 tools', () => {
+    expect(ALL_TOOL_NAMES).toHaveLength(74);
   });
 
   it('all tool names are unique', () => {
