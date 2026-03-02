@@ -1280,6 +1280,189 @@ describe('Game command handlers — new tools (shader, audio, nav, tilemap, coll
 });
 
 // ---------------------------------------------------------------------------
+// 7c. Group, timer, particles, animation, export, state, physics, joint, bone, theme, viewport, debug handlers
+// ---------------------------------------------------------------------------
+describe('Game command handlers — new tools (group, timer, particles, animation, physics, etc.)', () => {
+  // game_manage_group
+  describe('handleGameManageGroup', () => {
+    const argsFn = (a: any) => ({
+      action: a.action,
+      ...(a.nodePath ? { node_path: a.nodePath } : {}),
+      ...(a.group ? { group: a.group } : {}),
+    });
+
+    it('passes add action with group', () => {
+      const r = fakeGameCommand(true, true, { action: 'add', nodePath: '/root/Player', group: 'enemies' }, argsFn);
+      expect(r.commandArgs).toEqual({ action: 'add', node_path: '/root/Player', group: 'enemies' });
+    });
+
+    it('passes get_groups without group param', () => {
+      const r = fakeGameCommand(true, true, { action: 'get_groups', nodePath: '/root/Player' }, argsFn);
+      expect(r.commandArgs).toEqual({ action: 'get_groups', node_path: '/root/Player' });
+    });
+  });
+
+  // game_create_timer
+  describe('handleGameCreateTimer', () => {
+    const argsFn = (a: any) => ({
+      parent_path: a.parentPath || '/root',
+      wait_time: a.waitTime ?? 1.0,
+      one_shot: a.oneShot ?? false,
+      autostart: a.autostart ?? false,
+    });
+
+    it('defaults to /root parent and 1s wait', () => {
+      const r = fakeGameCommand(true, true, {}, argsFn);
+      expect(r.commandArgs).toEqual({ parent_path: '/root', wait_time: 1.0, one_shot: false, autostart: false });
+    });
+
+    it('passes custom timer settings', () => {
+      const r = fakeGameCommand(true, true, { parentPath: '/root/Game', waitTime: 5.0, oneShot: true, autostart: true }, argsFn);
+      expect(r.commandArgs).toEqual({ parent_path: '/root/Game', wait_time: 5.0, one_shot: true, autostart: true });
+    });
+  });
+
+  // game_set_particles
+  describe('handleGameSetParticles', () => {
+    const argsFn = (a: any) => ({
+      node_path: a.nodePath,
+      ...(a.emitting !== undefined ? { emitting: a.emitting } : {}),
+      ...(a.amount !== undefined ? { amount: a.amount } : {}),
+    });
+
+    it('passes particle settings', () => {
+      const r = fakeGameCommand(true, true, { nodePath: '/root/Particles', emitting: true, amount: 100 }, argsFn);
+      expect(r.commandArgs).toEqual({ node_path: '/root/Particles', emitting: true, amount: 100 });
+    });
+  });
+
+  // game_create_animation
+  describe('handleGameCreateAnimation', () => {
+    const argsFn = (a: any) => ({
+      node_path: a.nodePath, animation_name: a.animationName,
+      length: a.length ?? 1.0, loop_mode: a.loopMode ?? 0, tracks: a.tracks || [],
+    });
+
+    it('passes animation params', () => {
+      const r = fakeGameCommand(true, true, { nodePath: '/root/AnimPlayer', animationName: 'walk', length: 2.0 }, argsFn);
+      expect(r.commandArgs).toEqual({ node_path: '/root/AnimPlayer', animation_name: 'walk', length: 2.0, loop_mode: 0, tracks: [] });
+    });
+  });
+
+  // export_project
+  describe('handleExportProject', () => {
+    it('source defines handleExportProject method', () => {
+      expect(sourceCode).toContain('handleExportProject');
+    });
+
+    it('uses execFileAsync for headless export', () => {
+      expect(sourceCode).toContain('--export-release');
+      expect(sourceCode).toContain('--export-debug');
+    });
+  });
+
+  // game_serialize_state
+  describe('handleGameSerializeState', () => {
+    const argsFn = (a: any) => ({
+      node_path: a.nodePath || '/root', action: a.action || 'save', max_depth: a.maxDepth ?? 5,
+    });
+
+    it('defaults to save with depth 5', () => {
+      const r = fakeGameCommand(true, true, {}, argsFn);
+      expect(r.commandArgs).toEqual({ node_path: '/root', action: 'save', max_depth: 5 });
+    });
+  });
+
+  // game_physics_body
+  describe('handleGamePhysicsBody', () => {
+    const argsFn = (a: any) => ({
+      node_path: a.nodePath,
+      ...(a.mass !== undefined ? { mass: a.mass } : {}),
+      ...(a.gravityScale !== undefined ? { gravity_scale: a.gravityScale } : {}),
+    });
+
+    it('passes physics body params', () => {
+      const r = fakeGameCommand(true, true, { nodePath: '/root/Ball', mass: 2.0, gravityScale: 0.5 }, argsFn);
+      expect(r.commandArgs).toEqual({ node_path: '/root/Ball', mass: 2.0, gravity_scale: 0.5 });
+    });
+  });
+
+  // game_create_joint
+  describe('handleGameCreateJoint', () => {
+    const argsFn = (a: any) => ({
+      parent_path: a.parentPath, joint_type: a.jointType,
+      ...(a.nodeAPath ? { node_a_path: a.nodeAPath } : {}),
+      ...(a.nodeBPath ? { node_b_path: a.nodeBPath } : {}),
+    });
+
+    it('passes joint creation params', () => {
+      const r = fakeGameCommand(true, true, { parentPath: '/root', jointType: 'pin_3d', nodeAPath: '/root/A', nodeBPath: '/root/B' }, argsFn);
+      expect(r.commandArgs).toEqual({ parent_path: '/root', joint_type: 'pin_3d', node_a_path: '/root/A', node_b_path: '/root/B' });
+    });
+  });
+
+  // game_bone_pose
+  describe('handleGameBonePose', () => {
+    const argsFn = (a: any) => ({
+      node_path: a.nodePath, action: a.action || 'list',
+      ...(a.boneName ? { bone_name: a.boneName } : {}),
+    });
+
+    it('defaults to list action', () => {
+      const r = fakeGameCommand(true, true, { nodePath: '/root/Skeleton' }, argsFn);
+      expect(r.commandArgs).toEqual({ node_path: '/root/Skeleton', action: 'list' });
+    });
+  });
+
+  // game_ui_theme
+  describe('handleGameUiTheme', () => {
+    const argsFn = (a: any) => ({ node_path: a.nodePath, overrides: a.overrides });
+
+    it('passes theme overrides', () => {
+      const overrides = { colors: { font_color: { r: 1, g: 0, b: 0, a: 1 } } };
+      const r = fakeGameCommand(true, true, { nodePath: '/root/Label', overrides }, argsFn);
+      expect(r.commandArgs!.node_path).toBe('/root/Label');
+      expect(r.commandArgs!.overrides.colors.font_color.r).toBe(1);
+    });
+  });
+
+  // game_viewport
+  describe('handleGameViewport', () => {
+    const argsFn = (a: any) => ({
+      action: a.action || 'create',
+      ...(a.parentPath ? { parent_path: a.parentPath } : {}),
+      ...(a.width !== undefined ? { width: a.width } : {}),
+      ...(a.height !== undefined ? { height: a.height } : {}),
+    });
+
+    it('defaults to create action', () => {
+      const r = fakeGameCommand(true, true, { parentPath: '/root', width: 256, height: 256 }, argsFn);
+      expect(r.commandArgs).toEqual({ action: 'create', parent_path: '/root', width: 256, height: 256 });
+    });
+  });
+
+  // game_debug_draw
+  describe('handleGameDebugDraw', () => {
+    const argsFn = (a: any) => ({
+      action: a.action,
+      ...(a.from ? { from: a.from } : {}),
+      ...(a.to ? { to: a.to } : {}),
+      ...(a.color ? { color: a.color } : {}),
+    });
+
+    it('passes line draw params', () => {
+      const r = fakeGameCommand(true, true, { action: 'line', from: { x: 0, y: 0, z: 0 }, to: { x: 1, y: 1, z: 1 } }, argsFn);
+      expect(r.commandArgs).toEqual({ action: 'line', from: { x: 0, y: 0, z: 0 }, to: { x: 1, y: 1, z: 1 } });
+    });
+
+    it('passes clear action', () => {
+      const r = fakeGameCommand(true, true, { action: 'clear' }, argsFn);
+      expect(r.commandArgs).toEqual({ action: 'clear' });
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 8. createErrorResponse in handlers
 // ---------------------------------------------------------------------------
 describe('Error response format in handlers', () => {
@@ -1341,8 +1524,8 @@ describe('Tool dispatch switch statement', () => {
   it('every case returns await this.handle*', () => {
     const caseRegex = /case '(\w+)':\s*\n\s*return await this\.handle/g;
     const matches = [...sourceCode.matchAll(caseRegex)];
-    // Should match all 74 tools
-    expect(matches.length).toBe(74);
+    // Should match all 86 tools
+    expect(matches.length).toBe(86);
   });
 
   it('no case falls through without return', () => {

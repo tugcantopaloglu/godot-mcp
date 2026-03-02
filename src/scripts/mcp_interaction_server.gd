@@ -191,6 +191,28 @@ func _handle_command(json_str: String) -> void:
 			_cmd_add_collision(params)
 		"environment":
 			_cmd_environment(params)
+		"manage_group":
+			_cmd_manage_group(params)
+		"create_timer":
+			_cmd_create_timer(params)
+		"set_particles":
+			_cmd_set_particles(params)
+		"create_animation":
+			_cmd_create_animation(params)
+		"serialize_state":
+			_cmd_serialize_state(params)
+		"physics_body":
+			_cmd_physics_body(params)
+		"create_joint":
+			_cmd_create_joint(params)
+		"bone_pose":
+			_cmd_bone_pose(params)
+		"ui_theme":
+			_cmd_ui_theme(params)
+		"viewport":
+			_cmd_viewport(params)
+		"debug_draw":
+			_cmd_debug_draw(params)
 		_:
 			_send_response({"error": "Unknown command: %s" % command})
 
@@ -1860,7 +1882,714 @@ func _get_environment_state(env: Environment) -> Dictionary:
 	}
 
 
+# --- Manage Group ---
+func _cmd_manage_group(params: Dictionary) -> void:
+	var action: String = params.get("action", "")
+	var group_name: String = params.get("group", "")
+
+	if action == "clear_group":
+		if group_name.is_empty():
+			_send_response({"error": "group is required for clear_group"})
+			return
+		var nodes: Array = get_tree().get_nodes_in_group(group_name)
+		for node in nodes:
+			node.remove_from_group(group_name)
+		_send_response({"success": true, "action": "clear_group", "group": group_name, "removed_count": nodes.size()})
+		return
+
+	var node_path: String = params.get("node_path", "")
+	if node_path.is_empty():
+		_send_response({"error": "node_path is required"})
+		return
+
+	var node: Node = get_tree().root.get_node_or_null(node_path)
+	if node == null:
+		_send_response({"error": "Node not found: %s" % node_path})
+		return
+
+	match action:
+		"add":
+			if group_name.is_empty():
+				_send_response({"error": "group is required for add"})
+				return
+			node.add_to_group(group_name)
+			_send_response({"success": true, "action": "add", "node_path": node_path, "group": group_name})
+		"remove":
+			if group_name.is_empty():
+				_send_response({"error": "group is required for remove"})
+				return
+			node.remove_from_group(group_name)
+			_send_response({"success": true, "action": "remove", "node_path": node_path, "group": group_name})
+		"get_groups":
+			var groups: Array = []
+			for g in node.get_groups():
+				groups.append(str(g))
+			_send_response({"success": true, "action": "get_groups", "node_path": node_path, "groups": groups})
+		_:
+			_send_response({"error": "Unknown group action: %s. Use add, remove, get_groups, or clear_group" % action})
+
+
+# --- Create Timer ---
+func _cmd_create_timer(params: Dictionary) -> void:
+	var parent_path: String = params.get("parent_path", "/root")
+	var wait_time: float = float(params.get("wait_time", 1.0))
+	var one_shot: bool = params.get("one_shot", false)
+	var autostart: bool = params.get("autostart", false)
+
+	var parent: Node = get_tree().root.get_node_or_null(parent_path)
+	if parent == null:
+		_send_response({"error": "Parent node not found: %s" % parent_path})
+		return
+
+	var timer: Timer = Timer.new()
+	timer.wait_time = wait_time
+	timer.one_shot = one_shot
+	timer.autostart = autostart
+	if params.has("name") and params["name"] is String and not (params["name"] as String).is_empty():
+		timer.name = params["name"]
+	parent.add_child(timer)
+	if autostart:
+		timer.start()
+	_send_response({"success": true, "path": str(timer.get_path()), "name": timer.name, "wait_time": timer.wait_time, "one_shot": timer.one_shot, "autostart": autostart})
+
+
+# --- Set Particles ---
+func _cmd_set_particles(params: Dictionary) -> void:
+	var node_path: String = params.get("node_path", "")
+	if node_path.is_empty():
+		_send_response({"error": "node_path is required"})
+		return
+
+	var node: Node = get_tree().root.get_node_or_null(node_path)
+	if node == null:
+		_send_response({"error": "Node not found: %s" % node_path})
+		return
+
+	if not (node is GPUParticles2D or node is GPUParticles3D):
+		_send_response({"error": "Node is not a GPUParticles node: %s (is %s)" % [node_path, node.get_class()]})
+		return
+
+	# Set direct particle properties
+	if params.has("emitting"):
+		node.set("emitting", bool(params["emitting"]))
+	if params.has("amount"):
+		node.set("amount", int(params["amount"]))
+	if params.has("lifetime"):
+		node.set("lifetime", float(params["lifetime"]))
+	if params.has("one_shot"):
+		node.set("one_shot", bool(params["one_shot"]))
+	if params.has("speed_scale"):
+		node.set("speed_scale", float(params["speed_scale"]))
+	if params.has("explosiveness"):
+		node.set("explosiveness", float(params["explosiveness"]))
+	if params.has("randomness"):
+		node.set("randomness", float(params["randomness"]))
+
+	# Configure process material
+	if params.has("process_material"):
+		var mat_params: Dictionary = params["process_material"]
+		var mat: ParticleProcessMaterial = node.get("process_material") as ParticleProcessMaterial
+		if mat == null:
+			mat = ParticleProcessMaterial.new()
+			node.set("process_material", mat)
+		if mat_params.has("direction"):
+			var d: Dictionary = mat_params["direction"]
+			mat.direction = Vector3(float(d.get("x", 0)), float(d.get("y", -1)), float(d.get("z", 0)))
+		if mat_params.has("spread"):
+			mat.spread = float(mat_params["spread"])
+		if mat_params.has("gravity"):
+			var g: Dictionary = mat_params["gravity"]
+			mat.gravity = Vector3(float(g.get("x", 0)), float(g.get("y", -9.8)), float(g.get("z", 0)))
+		if mat_params.has("initial_velocity_min"):
+			mat.initial_velocity_min = float(mat_params["initial_velocity_min"])
+		if mat_params.has("initial_velocity_max"):
+			mat.initial_velocity_max = float(mat_params["initial_velocity_max"])
+		if mat_params.has("color"):
+			var c: Dictionary = mat_params["color"]
+			mat.color = Color(float(c.get("r", 1)), float(c.get("g", 1)), float(c.get("b", 1)), float(c.get("a", 1)))
+		if mat_params.has("scale_min"):
+			mat.scale_min = float(mat_params["scale_min"])
+		if mat_params.has("scale_max"):
+			mat.scale_max = float(mat_params["scale_max"])
+
+	_send_response({
+		"success": true, "node_path": node_path,
+		"emitting": node.get("emitting"), "amount": node.get("amount"),
+		"lifetime": node.get("lifetime"), "one_shot": node.get("one_shot"),
+		"speed_scale": node.get("speed_scale")
+	})
+
+
+# --- Create Animation ---
+func _cmd_create_animation(params: Dictionary) -> void:
+	var node_path: String = params.get("node_path", "")
+	var anim_name: String = params.get("animation_name", "")
+	if node_path.is_empty() or anim_name.is_empty():
+		_send_response({"error": "node_path and animation_name are required"})
+		return
+
+	var node: Node = get_tree().root.get_node_or_null(node_path)
+	if node == null:
+		_send_response({"error": "Node not found: %s" % node_path})
+		return
+
+	if not node is AnimationPlayer:
+		_send_response({"error": "Node is not an AnimationPlayer: %s (is %s)" % [node_path, node.get_class()]})
+		return
+
+	var anim_player: AnimationPlayer = node as AnimationPlayer
+	var anim: Animation = Animation.new()
+	anim.length = float(params.get("length", 1.0))
+	var loop_mode: int = int(params.get("loop_mode", 0))
+	anim.loop_mode = loop_mode as Animation.LoopMode
+
+	var tracks: Array = params.get("tracks", [])
+	var track_count: int = 0
+	for track_data in tracks:
+		var track_type_str: String = track_data.get("type", "value")
+		var track_path: String = track_data.get("path", "")
+		if track_path.is_empty():
+			continue
+
+		var track_type: int = Animation.TYPE_VALUE
+		match track_type_str:
+			"value":
+				track_type = Animation.TYPE_VALUE
+			"method":
+				track_type = Animation.TYPE_METHOD
+			"bezier":
+				track_type = Animation.TYPE_BEZIER
+			"audio":
+				track_type = Animation.TYPE_AUDIO
+
+		var idx: int = anim.add_track(track_type)
+		anim.track_set_path(idx, NodePath(track_path))
+
+		var keys: Array = track_data.get("keys", [])
+		for key_data in keys:
+			var time: float = float(key_data.get("time", 0.0))
+			match track_type:
+				Animation.TYPE_VALUE:
+					var value: Variant = _json_to_variant(key_data.get("value", null), key_data.get("type_hint", ""))
+					anim.track_insert_key(idx, time, value)
+					if key_data.has("transition"):
+						var key_idx: int = anim.track_find_key(idx, time, Animation.FIND_MODE_APPROX)
+						if key_idx >= 0:
+							anim.track_set_key_transition(idx, key_idx, float(key_data["transition"]))
+				Animation.TYPE_METHOD:
+					var method_name: String = key_data.get("method", "")
+					var args: Array = key_data.get("args", [])
+					anim.track_insert_key(idx, time, {"method": method_name, "args": args})
+				Animation.TYPE_BEZIER:
+					var value: float = float(key_data.get("value", 0.0))
+					anim.bezier_track_insert_key(idx, time, value)
+				Animation.TYPE_AUDIO:
+					var stream_path: String = key_data.get("stream", "")
+					if not stream_path.is_empty():
+						var stream: AudioStream = load(stream_path) as AudioStream
+						if stream != null:
+							anim.audio_track_insert_key(idx, time, stream)
+		track_count += 1
+
+	# Add to library (use default "" library if it exists, otherwise create it)
+	var lib_name: String = params.get("library", "")
+	var lib: AnimationLibrary = null
+	if anim_player.has_animation_library(lib_name):
+		lib = anim_player.get_animation_library(lib_name)
+	else:
+		lib = AnimationLibrary.new()
+		anim_player.add_animation_library(lib_name, lib)
+	lib.add_animation(anim_name, anim)
+
+	_send_response({"success": true, "animation_name": anim_name, "length": anim.length, "loop_mode": loop_mode, "track_count": track_count})
+
+
+# --- Serialize State ---
+func _cmd_serialize_state(params: Dictionary) -> void:
+	var node_path: String = params.get("node_path", "/root")
+	var action: String = params.get("action", "save")
+	var max_depth: int = int(params.get("max_depth", 5))
+
+	var node: Node = get_tree().root.get_node_or_null(node_path)
+	if node == null:
+		_send_response({"error": "Node not found: %s" % node_path})
+		return
+
+	match action:
+		"save":
+			var state: Dictionary = _serialize_node(node, max_depth, 0)
+			_send_response({"success": true, "action": "save", "state": state})
+		"load":
+			var data: Dictionary = params.get("data", {})
+			if data.is_empty():
+				_send_response({"error": "data is required for load action"})
+				return
+			var count: int = _deserialize_node(node, data)
+			_send_response({"success": true, "action": "load", "restored_count": count})
+		_:
+			_send_response({"error": "Unknown serialize action: %s. Use save or load" % action})
+
+
+func _serialize_node(node: Node, max_depth: int, depth: int) -> Dictionary:
+	var result: Dictionary = {
+		"class": node.get_class(),
+		"name": node.name,
+		"path": str(node.get_path()),
+	}
+	# Capture editor-visible properties
+	var props: Dictionary = {}
+	for prop in node.get_property_list():
+		var prop_dict: Dictionary = prop
+		if prop_dict.get("usage", 0) & PROPERTY_USAGE_STORAGE:
+			var prop_name: String = prop_dict.get("name", "")
+			if prop_name.is_empty() or prop_name.begins_with("_"):
+				continue
+			props[prop_name] = _variant_to_json(node.get(prop_name))
+	result["properties"] = props
+
+	if depth < max_depth:
+		var children: Array = []
+		for child in node.get_children():
+			# Skip the MCP interaction server itself
+			if child == self:
+				continue
+			children.append(_serialize_node(child, max_depth, depth + 1))
+		result["children"] = children
+
+	return result
+
+
+func _deserialize_node(node: Node, data: Dictionary) -> int:
+	var count: int = 0
+	# Restore properties
+	var props: Dictionary = data.get("properties", {})
+	for prop_name in props:
+		var value: Variant = _json_to_variant_for_property(node, prop_name, props[prop_name])
+		node.set(prop_name, value)
+	count += 1
+
+	# Restore children
+	var children_data: Array = data.get("children", [])
+	for child_data in children_data:
+		var child_name: String = child_data.get("name", "")
+		var child: Node = null
+		for c in node.get_children():
+			if c.name == child_name:
+				child = c
+				break
+		if child != null:
+			count += _deserialize_node(child, child_data)
+	return count
+
+
+# --- Physics Body ---
+func _cmd_physics_body(params: Dictionary) -> void:
+	var node_path: String = params.get("node_path", "")
+	if node_path.is_empty():
+		_send_response({"error": "node_path is required"})
+		return
+
+	var node: Node = get_tree().root.get_node_or_null(node_path)
+	if node == null:
+		_send_response({"error": "Node not found: %s" % node_path})
+		return
+
+	if not (node is PhysicsBody2D or node is PhysicsBody3D):
+		_send_response({"error": "Node is not a PhysicsBody: %s (is %s)" % [node_path, node.get_class()]})
+		return
+
+	# Set common physics properties
+	if params.has("gravity_scale") and node.get("gravity_scale") != null:
+		node.set("gravity_scale", float(params["gravity_scale"]))
+	if params.has("mass") and node.get("mass") != null:
+		node.set("mass", float(params["mass"]))
+	if params.has("freeze") and node.get("freeze") != null:
+		node.set("freeze", bool(params["freeze"]))
+	if params.has("sleeping") and node.get("sleeping") != null:
+		node.set("sleeping", bool(params["sleeping"]))
+	if params.has("linear_damp") and node.get("linear_damp") != null:
+		node.set("linear_damp", float(params["linear_damp"]))
+	if params.has("angular_damp") and node.get("angular_damp") != null:
+		node.set("angular_damp", float(params["angular_damp"]))
+
+	# Velocity (2D vs 3D)
+	if params.has("linear_velocity"):
+		var lv: Dictionary = params["linear_velocity"]
+		if node is PhysicsBody3D:
+			node.set("linear_velocity", Vector3(float(lv.get("x", 0)), float(lv.get("y", 0)), float(lv.get("z", 0))))
+		else:
+			node.set("linear_velocity", Vector2(float(lv.get("x", 0)), float(lv.get("y", 0))))
+	if params.has("angular_velocity"):
+		var av: Variant = params["angular_velocity"]
+		if node is PhysicsBody3D and av is Dictionary:
+			node.set("angular_velocity", Vector3(float(av.get("x", 0)), float(av.get("y", 0)), float(av.get("z", 0))))
+		else:
+			node.set("angular_velocity", float(av))
+
+	# Physics material (friction, bounce)
+	if params.has("friction") or params.has("bounce"):
+		var phys_mat: PhysicsMaterial = node.get("physics_material_override") as PhysicsMaterial
+		if phys_mat == null:
+			phys_mat = PhysicsMaterial.new()
+			node.set("physics_material_override", phys_mat)
+		if params.has("friction"):
+			phys_mat.friction = float(params["friction"])
+		if params.has("bounce"):
+			phys_mat.bounce = float(params["bounce"])
+
+	# Build response
+	var result: Dictionary = {"success": true, "node_path": node_path, "class": node.get_class()}
+	if node.get("mass") != null:
+		result["mass"] = node.get("mass")
+	if node.get("gravity_scale") != null:
+		result["gravity_scale"] = node.get("gravity_scale")
+	if node.get("linear_velocity") != null:
+		result["linear_velocity"] = _variant_to_json(node.get("linear_velocity"))
+	if node.get("angular_velocity") != null:
+		result["angular_velocity"] = _variant_to_json(node.get("angular_velocity"))
+	_send_response(result)
+
+
+# --- Create Joint ---
+func _cmd_create_joint(params: Dictionary) -> void:
+	var parent_path: String = params.get("parent_path", "")
+	var joint_type: String = params.get("joint_type", "")
+	if parent_path.is_empty() or joint_type.is_empty():
+		_send_response({"error": "parent_path and joint_type are required"})
+		return
+
+	var parent: Node = get_tree().root.get_node_or_null(parent_path)
+	if parent == null:
+		_send_response({"error": "Parent node not found: %s" % parent_path})
+		return
+
+	var node_a: String = params.get("node_a_path", "")
+	var node_b: String = params.get("node_b_path", "")
+	var joint: Node = null
+
+	match joint_type:
+		"pin_2d":
+			var j: PinJoint2D = PinJoint2D.new()
+			if not node_a.is_empty():
+				j.node_a = NodePath(node_a)
+			if not node_b.is_empty():
+				j.node_b = NodePath(node_b)
+			if params.has("softness"):
+				j.softness = float(params["softness"])
+			joint = j
+		"spring_2d":
+			var j: DampedSpringJoint2D = DampedSpringJoint2D.new()
+			if not node_a.is_empty():
+				j.node_a = NodePath(node_a)
+			if not node_b.is_empty():
+				j.node_b = NodePath(node_b)
+			if params.has("length"):
+				j.length = float(params["length"])
+			if params.has("rest_length"):
+				j.rest_length = float(params["rest_length"])
+			if params.has("stiffness"):
+				j.stiffness = float(params["stiffness"])
+			if params.has("damping"):
+				j.damping = float(params["damping"])
+			joint = j
+		"groove_2d":
+			var j: GrooveJoint2D = GrooveJoint2D.new()
+			if not node_a.is_empty():
+				j.node_a = NodePath(node_a)
+			if not node_b.is_empty():
+				j.node_b = NodePath(node_b)
+			if params.has("length"):
+				j.length = float(params["length"])
+			if params.has("initial_offset"):
+				j.initial_offset = float(params["initial_offset"])
+			joint = j
+		"pin_3d":
+			var j: PinJoint3D = PinJoint3D.new()
+			if not node_a.is_empty():
+				j.node_a = NodePath(node_a)
+			if not node_b.is_empty():
+				j.node_b = NodePath(node_b)
+			joint = j
+		"hinge_3d":
+			var j: HingeJoint3D = HingeJoint3D.new()
+			if not node_a.is_empty():
+				j.node_a = NodePath(node_a)
+			if not node_b.is_empty():
+				j.node_b = NodePath(node_b)
+			joint = j
+		"cone_3d":
+			var j: ConeTwistJoint3D = ConeTwistJoint3D.new()
+			if not node_a.is_empty():
+				j.node_a = NodePath(node_a)
+			if not node_b.is_empty():
+				j.node_b = NodePath(node_b)
+			joint = j
+		"slider_3d":
+			var j: SliderJoint3D = SliderJoint3D.new()
+			if not node_a.is_empty():
+				j.node_a = NodePath(node_a)
+			if not node_b.is_empty():
+				j.node_b = NodePath(node_b)
+			joint = j
+		_:
+			_send_response({"error": "Unknown joint type: %s. Use pin_2d, spring_2d, groove_2d, pin_3d, hinge_3d, cone_3d, or slider_3d" % joint_type})
+			return
+
+	parent.add_child(joint)
+	_send_response({"success": true, "joint_type": joint_type, "name": joint.name, "path": str(joint.get_path())})
+
+
+# --- Bone Pose ---
+func _cmd_bone_pose(params: Dictionary) -> void:
+	var node_path: String = params.get("node_path", "")
+	var action: String = params.get("action", "list")
+	if node_path.is_empty():
+		_send_response({"error": "node_path is required"})
+		return
+
+	var node: Node = get_tree().root.get_node_or_null(node_path)
+	if node == null:
+		_send_response({"error": "Node not found: %s" % node_path})
+		return
+
+	if not node is Skeleton3D:
+		_send_response({"error": "Node is not a Skeleton3D: %s (is %s)" % [node_path, node.get_class()]})
+		return
+
+	var skel: Skeleton3D = node as Skeleton3D
+
+	match action:
+		"list":
+			var bones: Array = []
+			for i in skel.get_bone_count():
+				bones.append({"index": i, "name": skel.get_bone_name(i), "parent": skel.get_bone_parent(i)})
+			_send_response({"success": true, "action": "list", "bone_count": skel.get_bone_count(), "bones": bones})
+		"get":
+			var bone_idx: int = _resolve_bone_index(skel, params)
+			if bone_idx < 0:
+				_send_response({"error": "Bone not found"})
+				return
+			_send_response({
+				"success": true, "action": "get", "bone_index": bone_idx,
+				"bone_name": skel.get_bone_name(bone_idx),
+				"position": _variant_to_json(skel.get_bone_pose_position(bone_idx)),
+				"rotation": _variant_to_json(skel.get_bone_pose_rotation(bone_idx)),
+				"scale": _variant_to_json(skel.get_bone_pose_scale(bone_idx))
+			})
+		"set":
+			var bone_idx: int = _resolve_bone_index(skel, params)
+			if bone_idx < 0:
+				_send_response({"error": "Bone not found"})
+				return
+			if params.has("position"):
+				var p: Dictionary = params["position"]
+				skel.set_bone_pose_position(bone_idx, Vector3(float(p.get("x", 0)), float(p.get("y", 0)), float(p.get("z", 0))))
+			if params.has("rotation"):
+				var r: Dictionary = params["rotation"]
+				skel.set_bone_pose_rotation(bone_idx, Quaternion(float(r.get("x", 0)), float(r.get("y", 0)), float(r.get("z", 0)), float(r.get("w", 1))))
+			if params.has("scale"):
+				var s: Dictionary = params["scale"]
+				skel.set_bone_pose_scale(bone_idx, Vector3(float(s.get("x", 1)), float(s.get("y", 1)), float(s.get("z", 1))))
+			_send_response({"success": true, "action": "set", "bone_index": bone_idx, "bone_name": skel.get_bone_name(bone_idx)})
+		_:
+			_send_response({"error": "Unknown bone action: %s. Use list, get, or set" % action})
+
+
+func _resolve_bone_index(skel: Skeleton3D, params: Dictionary) -> int:
+	if params.has("bone_index"):
+		return int(params["bone_index"])
+	if params.has("bone_name"):
+		return skel.find_bone(params["bone_name"])
+	return -1
+
+
+# --- UI Theme ---
+func _cmd_ui_theme(params: Dictionary) -> void:
+	var node_path: String = params.get("node_path", "")
+	if node_path.is_empty():
+		_send_response({"error": "node_path is required"})
+		return
+
+	var node: Node = get_tree().root.get_node_or_null(node_path)
+	if node == null:
+		_send_response({"error": "Node not found: %s" % node_path})
+		return
+
+	if not node is Control:
+		_send_response({"error": "Node is not a Control: %s (is %s)" % [node_path, node.get_class()]})
+		return
+
+	var ctrl: Control = node as Control
+	var overrides: Dictionary = params.get("overrides", {})
+	var applied: Array = []
+
+	# Color overrides
+	var colors: Dictionary = overrides.get("colors", {})
+	for name in colors:
+		var c: Dictionary = colors[name]
+		ctrl.add_theme_color_override(name, Color(float(c.get("r", 0)), float(c.get("g", 0)), float(c.get("b", 0)), float(c.get("a", 1))))
+		applied.append("color:" + name)
+
+	# Constant overrides
+	var constants: Dictionary = overrides.get("constants", {})
+	for name in constants:
+		ctrl.add_theme_constant_override(name, int(constants[name]))
+		applied.append("constant:" + name)
+
+	# Font size overrides
+	var font_sizes: Dictionary = overrides.get("font_sizes", {})
+	for name in font_sizes:
+		ctrl.add_theme_font_size_override(name, int(font_sizes[name]))
+		applied.append("font_size:" + name)
+
+	_send_response({"success": true, "node_path": node_path, "applied": applied})
+
+
+# --- Viewport ---
+func _cmd_viewport(params: Dictionary) -> void:
+	var action: String = params.get("action", "create")
+
+	match action:
+		"create":
+			var parent_path: String = params.get("parent_path", "/root")
+			var parent: Node = get_tree().root.get_node_or_null(parent_path)
+			if parent == null:
+				_send_response({"error": "Parent node not found: %s" % parent_path})
+				return
+			var viewport: SubViewport = SubViewport.new()
+			if params.has("width") and params.has("height"):
+				viewport.size = Vector2i(int(params["width"]), int(params["height"]))
+			if params.has("transparent_bg"):
+				viewport.transparent_bg = bool(params["transparent_bg"])
+			if params.has("msaa"):
+				viewport.msaa_2d = int(params["msaa"]) as Viewport.MSAA
+				viewport.msaa_3d = int(params["msaa"]) as Viewport.MSAA
+			if params.has("name") and params["name"] is String and not (params["name"] as String).is_empty():
+				viewport.name = params["name"]
+			var container: SubViewportContainer = SubViewportContainer.new()
+			container.add_child(viewport)
+			parent.add_child(container)
+			_send_response({"success": true, "action": "create", "viewport_path": str(viewport.get_path()), "container_path": str(container.get_path()), "size": _variant_to_json(viewport.size)})
+		"configure":
+			var node_path: String = params.get("node_path", "")
+			if node_path.is_empty():
+				_send_response({"error": "node_path is required for configure"})
+				return
+			var vp: Node = get_tree().root.get_node_or_null(node_path)
+			if vp == null or not vp is SubViewport:
+				_send_response({"error": "SubViewport not found: %s" % node_path})
+				return
+			var sv: SubViewport = vp as SubViewport
+			if params.has("width") and params.has("height"):
+				sv.size = Vector2i(int(params["width"]), int(params["height"]))
+			if params.has("transparent_bg"):
+				sv.transparent_bg = bool(params["transparent_bg"])
+			if params.has("msaa"):
+				sv.msaa_2d = int(params["msaa"]) as Viewport.MSAA
+				sv.msaa_3d = int(params["msaa"]) as Viewport.MSAA
+			_send_response({"success": true, "action": "configure", "size": _variant_to_json(sv.size), "transparent_bg": sv.transparent_bg})
+		"get":
+			var node_path: String = params.get("node_path", "")
+			if node_path.is_empty():
+				_send_response({"error": "node_path is required for get"})
+				return
+			var vp: Node = get_tree().root.get_node_or_null(node_path)
+			if vp == null or not vp is SubViewport:
+				_send_response({"error": "SubViewport not found: %s" % node_path})
+				return
+			var sv: SubViewport = vp as SubViewport
+			_send_response({"success": true, "action": "get", "size": _variant_to_json(sv.size), "transparent_bg": sv.transparent_bg, "msaa_2d": sv.msaa_2d, "msaa_3d": sv.msaa_3d})
+		_:
+			_send_response({"error": "Unknown viewport action: %s. Use create, configure, or get" % action})
+
+
+# --- Debug Draw ---
+var _debug_draw_node: Node = null
+var _debug_meshes: Array = []
+
+func _cmd_debug_draw(params: Dictionary) -> void:
+	var action: String = params.get("action", "line")
+	var color_dict: Dictionary = params.get("color", {"r": 1.0, "g": 0.0, "b": 0.0})
+	var color: Color = Color(float(color_dict.get("r", 1)), float(color_dict.get("g", 0)), float(color_dict.get("b", 0)), float(color_dict.get("a", 1)))
+	var duration: int = int(params.get("duration", 0))
+
+	if action == "clear":
+		_clear_debug_draw()
+		_send_response({"success": true, "action": "clear"})
+		return
+
+	# Ensure we have a debug draw parent
+	if _debug_draw_node == null or not is_instance_valid(_debug_draw_node):
+		_debug_draw_node = Node3D.new()
+		_debug_draw_node.name = "_McpDebugDraw"
+		get_tree().root.add_child(_debug_draw_node)
+
+	var mat: StandardMaterial3D = StandardMaterial3D.new()
+	mat.albedo_color = color
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.no_depth_test = true
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA if color.a < 1.0 else BaseMaterial3D.TRANSPARENCY_DISABLED
+
+	match action:
+		"line":
+			var from_dict: Dictionary = params.get("from", {})
+			var to_dict: Dictionary = params.get("to", {})
+			var from_pos: Vector3 = Vector3(float(from_dict.get("x", 0)), float(from_dict.get("y", 0)), float(from_dict.get("z", 0)))
+			var to_pos: Vector3 = Vector3(float(to_dict.get("x", 0)), float(to_dict.get("y", 0)), float(to_dict.get("z", 0)))
+			var im: ImmediateMesh = ImmediateMesh.new()
+			im.surface_begin(Mesh.PRIMITIVE_LINES, mat)
+			im.surface_add_vertex(from_pos)
+			im.surface_add_vertex(to_pos)
+			im.surface_end()
+			var mi: MeshInstance3D = MeshInstance3D.new()
+			mi.mesh = im
+			_debug_draw_node.add_child(mi)
+			_debug_meshes.append({"node": mi, "frames_left": duration})
+			_send_response({"success": true, "action": "line"})
+		"sphere":
+			var center_dict: Dictionary = params.get("center", {})
+			var center: Vector3 = Vector3(float(center_dict.get("x", 0)), float(center_dict.get("y", 0)), float(center_dict.get("z", 0)))
+			var radius: float = float(params.get("radius", 0.5))
+			var sphere_mesh: SphereMesh = SphereMesh.new()
+			sphere_mesh.radius = radius
+			sphere_mesh.height = radius * 2.0
+			sphere_mesh.material = mat
+			var mi: MeshInstance3D = MeshInstance3D.new()
+			mi.mesh = sphere_mesh
+			mi.global_position = center
+			_debug_draw_node.add_child(mi)
+			_debug_meshes.append({"node": mi, "frames_left": duration})
+			_send_response({"success": true, "action": "sphere"})
+		"box":
+			var center_dict: Dictionary = params.get("center", {})
+			var center: Vector3 = Vector3(float(center_dict.get("x", 0)), float(center_dict.get("y", 0)), float(center_dict.get("z", 0)))
+			var size_dict: Dictionary = params.get("size", {"x": 1, "y": 1, "z": 1})
+			var box_size: Vector3 = Vector3(float(size_dict.get("x", 1)), float(size_dict.get("y", 1)), float(size_dict.get("z", 1)))
+			var box_mesh: BoxMesh = BoxMesh.new()
+			box_mesh.size = box_size
+			box_mesh.material = mat
+			var mi: MeshInstance3D = MeshInstance3D.new()
+			mi.mesh = box_mesh
+			mi.global_position = center
+			_debug_draw_node.add_child(mi)
+			_debug_meshes.append({"node": mi, "frames_left": duration})
+			_send_response({"success": true, "action": "box"})
+		_:
+			_send_response({"error": "Unknown debug draw action: %s. Use line, sphere, box, or clear" % action})
+
+
+func _clear_debug_draw() -> void:
+	for entry in _debug_meshes:
+		if is_instance_valid(entry["node"]):
+			entry["node"].queue_free()
+	_debug_meshes.clear()
+	if _debug_draw_node != null and is_instance_valid(_debug_draw_node):
+		_debug_draw_node.queue_free()
+		_debug_draw_node = null
+
+
 func _exit_tree() -> void:
+	_clear_debug_draw()
 	if _client != null:
 		_client.disconnect_from_host()
 		_client = null

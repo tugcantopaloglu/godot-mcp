@@ -33,6 +33,10 @@ const ALL_TOOL_NAMES = [
   // Shader, audio, navigation, tilemap, collision, environment tools
   'game_set_shader_param', 'game_audio_play', 'game_audio_bus', 'game_navigate_path',
   'game_tilemap', 'game_add_collision', 'game_environment',
+  // Group, timer, particles, animation, export, state, physics, joint, bone, theme, viewport, debug tools
+  'game_manage_group', 'game_create_timer', 'game_set_particles', 'game_create_animation',
+  'export_project', 'game_serialize_state', 'game_physics_body', 'game_create_joint',
+  'game_bone_pose', 'game_ui_theme', 'game_viewport', 'game_debug_draw',
 ];
 
 let sourceCode: string;
@@ -42,8 +46,8 @@ beforeAll(() => {
 });
 
 describe('Tool definitions', () => {
-  it('defines exactly 74 tools', () => {
-    expect(ALL_TOOL_NAMES).toHaveLength(74);
+  it('defines exactly 86 tools', () => {
+    expect(ALL_TOOL_NAMES).toHaveLength(86);
   });
 
   it('all tool names are unique', () => {

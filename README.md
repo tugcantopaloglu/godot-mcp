@@ -8,7 +8,7 @@
 [![](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white 'TypeScript')](https://www.typescriptlang.org/)
 [![](https://img.shields.io/badge/License-MIT-red.svg 'MIT License')](https://opensource.org/licenses/MIT)
 
-A comprehensive [Model Context Protocol](https://modelcontextprotocol.io/introduction) (MCP) server that gives AI assistants **full control** over the Godot game engine. **74 tools** spanning file I/O, runtime code execution, property inspection, scene manipulation, animation control, signal management, tweening, project creation, camera control, physics raycasting, and more.
+A comprehensive [Model Context Protocol](https://modelcontextprotocol.io/introduction) (MCP) server that gives AI assistants **full control** over the Godot game engine. **86 tools** spanning file I/O, runtime code execution, property inspection, scene manipulation, animation control, signal management, tweening, project creation, camera control, physics raycasting, and more.
 
 ## Acknowledgments
 
@@ -16,7 +16,7 @@ This project is built upon and extends [godot-mcp](https://github.com/Coding-Sol
 
 ## What's New (Improvements Over Original)
 
-The original godot-mcp provided 20 tools for basic project management and scene creation. This fork extends it to **74 tools** with the following major additions:
+The original godot-mcp provided 20 tools for basic project management and scene creation. This fork extends it to **86 tools** with the following major additions:
 
 ### Runtime Code Execution
 - **`game_eval`** - Execute arbitrary GDScript code in the running game with return values
@@ -91,6 +91,18 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 - **`game_tilemap`** - Get/set TileMapLayer cells
 - **`game_add_collision`** - Add collision shapes to physics bodies
 - **`game_environment`** - Configure post-processing (fog, glow, SSAO, tonemap, etc.)
+- **`game_manage_group`** - Add/remove nodes from groups
+- **`game_create_timer`** - Create timer nodes programmatically
+- **`game_set_particles`** - Configure GPUParticles2D/3D properties and process materials
+- **`game_create_animation`** - Create animations with value/method/bezier/audio tracks and keyframes
+- **`export_project`** - Trigger headless project export builds (CI/CD ready)
+- **`game_serialize_state`** - Save/load entire node tree state as JSON
+- **`game_physics_body`** - Configure mass, velocity, damping, friction, bounce
+- **`game_create_joint`** - Create physics joints (pin, spring, hinge, cone, slider)
+- **`game_bone_pose`** - Get/set skeleton bone poses for character animation
+- **`game_ui_theme`** - Apply color, constant, and font size theme overrides
+- **`game_viewport`** - Create/configure SubViewport nodes
+- **`game_debug_draw`** - Draw debug geometry (lines, spheres, boxes)
 
 ### Robustness Improvements
 - **Reentrancy guard** - Prevents concurrent command processing during async operations
@@ -99,7 +111,7 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 - **PackedArray serialization** - Proper JSON arrays instead of string fallback
 - **Graceful error handling** - Scene read fallback to raw .tscn text on missing dependencies
 
-## All 74 Tools
+## All 86 Tools
 
 ### Project Management (7 tools)
 | Tool | Description |
@@ -223,7 +235,7 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `manage_input_map` | Add, remove, or list input actions |
 | `manage_export_presets` | Create or modify export presets |
 
-### Advanced Runtime (12 tools)
+### Advanced Runtime (24 tools)
 | Tool | Description |
 |------|-------------|
 | `game_get_camera` | Get active camera position/rotation/zoom |
@@ -238,6 +250,22 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `game_tilemap` | Get or set cells in a TileMapLayer node |
 | `game_add_collision` | Add a collision shape to a physics body node |
 | `game_environment` | Get or set environment and post-processing settings |
+| `game_manage_group` | Add or remove a node from a group, or list groups |
+| `game_create_timer` | Create a Timer node with configuration |
+| `game_set_particles` | Configure GPUParticles2D/3D node properties |
+| `game_create_animation` | Create an animation with tracks and keyframes |
+| `game_serialize_state` | Save or load node tree state as JSON |
+| `game_physics_body` | Configure physics body properties (mass, velocity) |
+| `game_create_joint` | Create a physics joint between two bodies |
+| `game_bone_pose` | Get or set bone poses on a Skeleton3D node |
+| `game_ui_theme` | Apply theme overrides to a Control node |
+| `game_viewport` | Create or configure a SubViewport node |
+| `game_debug_draw` | Draw debug lines, spheres, or boxes in 3D |
+
+### Build & Export (1 tool)
+| Tool | Description |
+|------|-------------|
+| `export_project` | Export a Godot project using a preset |
 
 ## Requirements
 
@@ -348,7 +376,7 @@ The project uses [Vitest](https://vitest.dev/) with 246 tests across 3 files:
 | File | Tests | What it covers |
 |------|-------|----------------|
 | `tests/utils.test.ts` | 31 | Parameter mappings, normalization, path validation, error responses, version detection |
-| `tests/tool-definitions.test.ts` | 75 | All 74 tools defined, schemas valid, names unique, descriptions < 80 chars |
+| `tests/tool-definitions.test.ts` | 75 | All 86 tools defined, schemas valid, names unique, descriptions < 80 chars |
 | `tests/handlers.test.ts` | 140 | Game command arg transforms, required-param validation, headless op path checks, source structure |
 
 ```bash

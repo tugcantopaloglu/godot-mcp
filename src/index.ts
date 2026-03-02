@@ -1938,6 +1938,202 @@ class GodotServer {
             required: [],
           },
         },
+        // Group, timer, particles, animation, export, state, physics, joint, bone, theme, viewport, debug tools
+        {
+          name: 'game_manage_group',
+          description: 'Add or remove a node from a group, or list groups',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              nodePath: { type: 'string', description: 'Path to the node' },
+              action: { type: 'string', description: 'Action: add, remove, get_groups, clear_group' },
+              group: { type: 'string', description: 'Group name' },
+            },
+            required: ['action'],
+          },
+        },
+        {
+          name: 'game_create_timer',
+          description: 'Create a Timer node with configuration',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              parentPath: { type: 'string', description: 'Parent node path. Default: "/root"' },
+              waitTime: { type: 'number', description: 'Timer duration in seconds. Default: 1.0' },
+              oneShot: { type: 'boolean', description: 'One-shot mode. Default: false' },
+              autostart: { type: 'boolean', description: 'Auto-start the timer. Default: false' },
+              name: { type: 'string', description: 'Optional timer node name' },
+            },
+            required: [],
+          },
+        },
+        {
+          name: 'game_set_particles',
+          description: 'Configure GPUParticles2D/3D node properties',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              nodePath: { type: 'string', description: 'Path to GPUParticles node' },
+              emitting: { type: 'boolean', description: 'Enable/disable emission' },
+              amount: { type: 'number', description: 'Number of particles' },
+              lifetime: { type: 'number', description: 'Particle lifetime in seconds' },
+              oneShot: { type: 'boolean', description: 'One-shot mode' },
+              speedScale: { type: 'number', description: 'Speed scale' },
+              explosiveness: { type: 'number', description: 'Explosiveness ratio (0-1)' },
+              randomness: { type: 'number', description: 'Randomness ratio (0-1)' },
+              processMaterial: { type: 'object', description: 'ParticleProcessMaterial settings' },
+            },
+            required: ['nodePath'],
+          },
+        },
+        {
+          name: 'game_create_animation',
+          description: 'Create an animation with tracks and keyframes',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              nodePath: { type: 'string', description: 'Path to AnimationPlayer node' },
+              animationName: { type: 'string', description: 'Name for the new animation' },
+              length: { type: 'number', description: 'Animation length in seconds. Default: 1.0' },
+              loopMode: { type: 'number', description: '0=none, 1=linear, 2=pingpong' },
+              tracks: { type: 'array', description: 'Array of track definitions' },
+              library: { type: 'string', description: 'Animation library name. Default: ""' },
+            },
+            required: ['nodePath', 'animationName'],
+          },
+        },
+        {
+          name: 'export_project',
+          description: 'Export a Godot project using a preset',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: { type: 'string', description: 'Godot project path' },
+              presetName: { type: 'string', description: 'Export preset name' },
+              outputPath: { type: 'string', description: 'Output file path for the exported build' },
+              debug: { type: 'boolean', description: 'Use debug export. Default: false' },
+            },
+            required: ['projectPath', 'presetName', 'outputPath'],
+          },
+        },
+        {
+          name: 'game_serialize_state',
+          description: 'Save or load node tree state as JSON',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              nodePath: { type: 'string', description: 'Root node path. Default: "/root"' },
+              action: { type: 'string', description: 'Action: save or load. Default: save' },
+              data: { type: 'object', description: 'State data to restore (for load)' },
+              maxDepth: { type: 'number', description: 'Max tree depth to serialize. Default: 5' },
+            },
+            required: [],
+          },
+        },
+        {
+          name: 'game_physics_body',
+          description: 'Configure physics body properties (mass, velocity, etc.)',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              nodePath: { type: 'string', description: 'Path to physics body node' },
+              gravityScale: { type: 'number', description: 'Gravity scale' },
+              mass: { type: 'number', description: 'Body mass' },
+              linearVelocity: { type: 'object', description: 'Linear velocity {x,y} or {x,y,z}' },
+              angularVelocity: { description: 'Angular velocity (float for 2D, {x,y,z} for 3D)' },
+              linearDamp: { type: 'number', description: 'Linear damping' },
+              angularDamp: { type: 'number', description: 'Angular damping' },
+              friction: { type: 'number', description: 'Physics material friction' },
+              bounce: { type: 'number', description: 'Physics material bounce' },
+              freeze: { type: 'boolean', description: 'Freeze the body' },
+              sleeping: { type: 'boolean', description: 'Put body to sleep' },
+            },
+            required: ['nodePath'],
+          },
+        },
+        {
+          name: 'game_create_joint',
+          description: 'Create a physics joint between two bodies',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              parentPath: { type: 'string', description: 'Parent node path for the joint' },
+              jointType: { type: 'string', description: 'Joint type: pin_2d, spring_2d, groove_2d, pin_3d, hinge_3d, cone_3d, slider_3d' },
+              nodeAPath: { type: 'string', description: 'Path to first body' },
+              nodeBPath: { type: 'string', description: 'Path to second body' },
+              stiffness: { type: 'number', description: 'Spring stiffness (spring_2d)' },
+              damping: { type: 'number', description: 'Spring damping (spring_2d)' },
+              length: { type: 'number', description: 'Length (spring_2d, groove_2d)' },
+              softness: { type: 'number', description: 'Softness (pin_2d)' },
+            },
+            required: ['parentPath', 'jointType'],
+          },
+        },
+        {
+          name: 'game_bone_pose',
+          description: 'Get or set bone poses on a Skeleton3D node',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              nodePath: { type: 'string', description: 'Path to Skeleton3D node' },
+              action: { type: 'string', description: 'Action: list, get, or set. Default: list' },
+              boneIndex: { type: 'number', description: 'Bone index' },
+              boneName: { type: 'string', description: 'Bone name (alternative to index)' },
+              position: { type: 'object', description: 'Bone position {x,y,z}' },
+              rotation: { type: 'object', description: 'Bone rotation quaternion {x,y,z,w}' },
+              scale: { type: 'object', description: 'Bone scale {x,y,z}' },
+            },
+            required: ['nodePath'],
+          },
+        },
+        {
+          name: 'game_ui_theme',
+          description: 'Apply theme overrides to a Control node',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              nodePath: { type: 'string', description: 'Path to Control node' },
+              overrides: { type: 'object', description: 'Theme overrides: {colors, constants, fontSizes}' },
+            },
+            required: ['nodePath', 'overrides'],
+          },
+        },
+        {
+          name: 'game_viewport',
+          description: 'Create or configure a SubViewport node',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              action: { type: 'string', description: 'Action: create, configure, or get' },
+              parentPath: { type: 'string', description: 'Parent path (for create)' },
+              nodePath: { type: 'string', description: 'SubViewport path (for configure/get)' },
+              width: { type: 'number', description: 'Viewport width' },
+              height: { type: 'number', description: 'Viewport height' },
+              msaa: { type: 'number', description: 'MSAA level (0=disabled, 1=2x, 2=4x, 3=8x)' },
+              transparentBg: { type: 'boolean', description: 'Transparent background' },
+              name: { type: 'string', description: 'Viewport name (for create)' },
+            },
+            required: [],
+          },
+        },
+        {
+          name: 'game_debug_draw',
+          description: 'Draw debug lines, spheres, or boxes in 3D',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              action: { type: 'string', description: 'Action: line, sphere, box, or clear' },
+              from: { type: 'object', description: 'Line start {x,y,z}' },
+              to: { type: 'object', description: 'Line end {x,y,z}' },
+              center: { type: 'object', description: 'Sphere/box center {x,y,z}' },
+              radius: { type: 'number', description: 'Sphere radius. Default: 0.5' },
+              size: { type: 'object', description: 'Box size {x,y,z}' },
+              color: { type: 'object', description: 'Draw color {r,g,b,a}. Default: red' },
+              duration: { type: 'number', description: 'Frames to persist (0=permanent)' },
+            },
+            required: ['action'],
+          },
+        },
       ],
     }));
 
@@ -2104,6 +2300,31 @@ class GodotServer {
           return await this.handleGameAddCollision(request.params.arguments);
         case 'game_environment':
           return await this.handleGameEnvironment(request.params.arguments);
+        // Group, timer, particles, animation, export, state, physics, joint, bone, theme, viewport, debug
+        case 'game_manage_group':
+          return await this.handleGameManageGroup(request.params.arguments);
+        case 'game_create_timer':
+          return await this.handleGameCreateTimer(request.params.arguments);
+        case 'game_set_particles':
+          return await this.handleGameSetParticles(request.params.arguments);
+        case 'game_create_animation':
+          return await this.handleGameCreateAnimation(request.params.arguments);
+        case 'export_project':
+          return await this.handleExportProject(request.params.arguments);
+        case 'game_serialize_state':
+          return await this.handleGameSerializeState(request.params.arguments);
+        case 'game_physics_body':
+          return await this.handleGamePhysicsBody(request.params.arguments);
+        case 'game_create_joint':
+          return await this.handleGameCreateJoint(request.params.arguments);
+        case 'game_bone_pose':
+          return await this.handleGameBonePose(request.params.arguments);
+        case 'game_ui_theme':
+          return await this.handleGameUiTheme(request.params.arguments);
+        case 'game_viewport':
+          return await this.handleGameViewport(request.params.arguments);
+        case 'game_debug_draw':
+          return await this.handleGameDebugDraw(request.params.arguments);
         default:
           throw new McpError(
             ErrorCode.MethodNotFound,
@@ -3971,6 +4192,185 @@ class GodotServer {
       }
     }
     return this.gameCommand('environment', { ...args }, () => params);
+  }
+
+  private async handleGameManageGroup(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.action)
+      return createErrorResponse('action is required.');
+    return this.gameCommand('manage_group', args, a => ({
+      action: a.action,
+      ...(a.nodePath ? { node_path: a.nodePath } : {}),
+      ...(a.group ? { group: a.group } : {}),
+    }));
+  }
+
+  private async handleGameCreateTimer(args: any) {
+    return this.gameCommand('create_timer', args, a => ({
+      parent_path: a.parentPath || '/root',
+      wait_time: a.waitTime ?? 1.0,
+      one_shot: a.oneShot ?? false,
+      autostart: a.autostart ?? false,
+      ...(a.name ? { name: a.name } : {}),
+    }));
+  }
+
+  private async handleGameSetParticles(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.nodePath)
+      return createErrorResponse('nodePath is required.');
+    return this.gameCommand('set_particles', args, a => ({
+      node_path: a.nodePath,
+      ...(a.emitting !== undefined ? { emitting: a.emitting } : {}),
+      ...(a.amount !== undefined ? { amount: a.amount } : {}),
+      ...(a.lifetime !== undefined ? { lifetime: a.lifetime } : {}),
+      ...(a.oneShot !== undefined ? { one_shot: a.oneShot } : {}),
+      ...(a.speedScale !== undefined ? { speed_scale: a.speedScale } : {}),
+      ...(a.explosiveness !== undefined ? { explosiveness: a.explosiveness } : {}),
+      ...(a.randomness !== undefined ? { randomness: a.randomness } : {}),
+      ...(a.processMaterial ? { process_material: a.processMaterial } : {}),
+    }));
+  }
+
+  private async handleGameCreateAnimation(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.nodePath || !args.animationName)
+      return createErrorResponse('nodePath and animationName are required.');
+    return this.gameCommand('create_animation', args, a => ({
+      node_path: a.nodePath,
+      animation_name: a.animationName,
+      length: a.length ?? 1.0,
+      loop_mode: a.loopMode ?? 0,
+      tracks: a.tracks || [],
+      ...(a.library !== undefined ? { library: a.library } : {}),
+    }));
+  }
+
+  private async handleExportProject(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.projectPath || !args.presetName || !args.outputPath)
+      return createErrorResponse('projectPath, presetName, and outputPath are required.');
+    if (!validatePath(args.projectPath))
+      return createErrorResponse('Invalid project path.');
+    const projectFile = join(args.projectPath, 'project.godot');
+    if (!existsSync(projectFile))
+      return createErrorResponse(`Not a valid Godot project: ${args.projectPath}`);
+    if (!this.godotPath) {
+      await this.detectGodotPath();
+      if (!this.godotPath) return createErrorResponse('Could not find Godot executable.');
+    }
+    try {
+      const exportFlag = args.debug ? '--export-debug' : '--export-release';
+      const exportArgs = ['--headless', '--path', args.projectPath, exportFlag, args.presetName, args.outputPath];
+      const { stdout, stderr } = await execFileAsync(this.godotPath!, exportArgs, { timeout: 120000 });
+      if (stderr && stderr.includes('ERROR'))
+        return createErrorResponse(`Export failed: ${stderr}`);
+      return { content: [{ type: 'text', text: `Export succeeded.\n\nOutput: ${stdout || args.outputPath}` }] };
+    } catch (error: any) {
+      return createErrorResponse(`Export failed: ${error?.message || 'Unknown error'}`);
+    }
+  }
+
+  private async handleGameSerializeState(args: any) {
+    args = normalizeParameters(args || {});
+    return this.gameCommand('serialize_state', args, a => ({
+      node_path: a.nodePath || '/root',
+      action: a.action || 'save',
+      max_depth: a.maxDepth ?? 5,
+      ...(a.data ? { data: a.data } : {}),
+    }));
+  }
+
+  private async handleGamePhysicsBody(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.nodePath)
+      return createErrorResponse('nodePath is required.');
+    return this.gameCommand('physics_body', args, a => ({
+      node_path: a.nodePath,
+      ...(a.gravityScale !== undefined ? { gravity_scale: a.gravityScale } : {}),
+      ...(a.mass !== undefined ? { mass: a.mass } : {}),
+      ...(a.linearVelocity ? { linear_velocity: a.linearVelocity } : {}),
+      ...(a.angularVelocity !== undefined ? { angular_velocity: a.angularVelocity } : {}),
+      ...(a.linearDamp !== undefined ? { linear_damp: a.linearDamp } : {}),
+      ...(a.angularDamp !== undefined ? { angular_damp: a.angularDamp } : {}),
+      ...(a.friction !== undefined ? { friction: a.friction } : {}),
+      ...(a.bounce !== undefined ? { bounce: a.bounce } : {}),
+      ...(a.freeze !== undefined ? { freeze: a.freeze } : {}),
+      ...(a.sleeping !== undefined ? { sleeping: a.sleeping } : {}),
+    }));
+  }
+
+  private async handleGameCreateJoint(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.parentPath || !args.jointType)
+      return createErrorResponse('parentPath and jointType are required.');
+    return this.gameCommand('create_joint', args, a => ({
+      parent_path: a.parentPath,
+      joint_type: a.jointType,
+      ...(a.nodeAPath ? { node_a_path: a.nodeAPath } : {}),
+      ...(a.nodeBPath ? { node_b_path: a.nodeBPath } : {}),
+      ...(a.stiffness !== undefined ? { stiffness: a.stiffness } : {}),
+      ...(a.damping !== undefined ? { damping: a.damping } : {}),
+      ...(a.length !== undefined ? { length: a.length } : {}),
+      ...(a.restLength !== undefined ? { rest_length: a.restLength } : {}),
+      ...(a.softness !== undefined ? { softness: a.softness } : {}),
+      ...(a.initialOffset !== undefined ? { initial_offset: a.initialOffset } : {}),
+    }));
+  }
+
+  private async handleGameBonePose(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.nodePath)
+      return createErrorResponse('nodePath is required.');
+    return this.gameCommand('bone_pose', args, a => ({
+      node_path: a.nodePath,
+      action: a.action || 'list',
+      ...(a.boneIndex !== undefined ? { bone_index: a.boneIndex } : {}),
+      ...(a.boneName ? { bone_name: a.boneName } : {}),
+      ...(a.position ? { position: a.position } : {}),
+      ...(a.rotation ? { rotation: a.rotation } : {}),
+      ...(a.scale ? { scale: a.scale } : {}),
+    }));
+  }
+
+  private async handleGameUiTheme(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.nodePath || !args.overrides)
+      return createErrorResponse('nodePath and overrides are required.');
+    return this.gameCommand('ui_theme', args, a => ({
+      node_path: a.nodePath,
+      overrides: a.overrides,
+    }));
+  }
+
+  private async handleGameViewport(args: any) {
+    args = normalizeParameters(args || {});
+    return this.gameCommand('viewport', args, a => ({
+      action: a.action || 'create',
+      ...(a.parentPath ? { parent_path: a.parentPath } : {}),
+      ...(a.nodePath ? { node_path: a.nodePath } : {}),
+      ...(a.width !== undefined ? { width: a.width } : {}),
+      ...(a.height !== undefined ? { height: a.height } : {}),
+      ...(a.msaa !== undefined ? { msaa: a.msaa } : {}),
+      ...(a.transparentBg !== undefined ? { transparent_bg: a.transparentBg } : {}),
+      ...(a.name ? { name: a.name } : {}),
+    }));
+  }
+
+  private async handleGameDebugDraw(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.action)
+      return createErrorResponse('action is required.');
+    return this.gameCommand('debug_draw', args, a => ({
+      action: a.action,
+      ...(a.from ? { from: a.from } : {}),
+      ...(a.to ? { to: a.to } : {}),
+      ...(a.center ? { center: a.center } : {}),
+      ...(a.radius !== undefined ? { radius: a.radius } : {}),
+      ...(a.size ? { size: a.size } : {}),
+      ...(a.color ? { color: a.color } : {}),
+      ...(a.duration !== undefined ? { duration: a.duration } : {}),
+    }));
   }
 
   /**
