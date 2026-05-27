@@ -1452,6 +1452,25 @@ class GodotServer {
           },
         },
         {
+          name: 'get_scene_warnings',
+          description: 'Collect per-node editor warnings for a scene file (headless).',
+          tags: ['scene', 'headless'],
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Godot project path',
+              },
+              scenePath: {
+                type: 'string',
+                description: 'Scene file path (relative to project)',
+              },
+            },
+            required: ['projectPath', 'scenePath'],
+          },
+        },
+        {
           name: 'modify_scene_node',
           description: 'Modify node properties in a scene file (headless)',
           tags: ['scene', 'headless'],
@@ -3532,6 +3551,8 @@ class GodotServer {
         // Headless scene tools
         case 'read_scene':
           return await this.handleReadScene(request.params.arguments);
+        case 'get_scene_warnings':
+          return await this.handleGetSceneWarnings(request.params.arguments);
         case 'modify_scene_node':
           return await this.handleModifySceneNode(request.params.arguments);
         case 'remove_scene_node':
@@ -5000,6 +5021,61 @@ class GodotServer {
       };
     } catch (error: any) {
       return createErrorResponse(`Failed to read scene: ${error?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Handle the get_scene_warnings tool - Collect editor configuration warnings per node
+   */
+  private async handleGetSceneWarnings(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.projectPath || !args.scenePath) {
+      return createErrorResponse('projectPath and scenePath are required.');
+    }
+
+    if (!validateProjectPath(args.projectPath) || !validatePath(args.scenePath)) {
+      return createErrorResponse('Invalid path.');
+    }
+
+    const projectFile = projectGodotFile(args.projectPath);
+    if (!existsSync(projectFile)) {
+      return createErrorResponse(`Not a valid Godot project: ${args.projectPath}`);
+    }
+
+    const scenePath = projectFilePath(args.projectPath, args.scenePath);
+    if (!existsSync(scenePath)) {
+      return createErrorResponse(`Scene file does not exist: ${args.scenePath}`);
+    }
+
+    try {
+      const { stdout, stderr } = await this.executeOperation('get_scene_warnings', {
+        scenePath: args.scenePath,
+      }, args.projectPath);
+
+      const startMarker = 'WARNINGS_JSON_START';
+      const endMarker = 'WARNINGS_JSON_END';
+      const startIdx = stdout.indexOf(startMarker);
+      const endIdx = stdout.indexOf(endMarker);
+
+      if (startIdx !== -1 && endIdx !== -1) {
+        const jsonStr = stdout.substring(startIdx + startMarker.length, endIdx).trim();
+        try {
+          const parsed = JSON.parse(jsonStr);
+          return {
+            content: [{ type: 'text', text: JSON.stringify(parsed, null, 2) }],
+          };
+        } catch {
+          return {
+            content: [{ type: 'text', text: `Raw warnings data:\n${jsonStr}` }],
+          };
+        }
+      }
+
+      return {
+        content: [{ type: 'text', text: `get_scene_warnings output:\n${stdout}\n${stderr ? 'Errors:\n' + stderr : ''}` }],
+      };
+    } catch (error: any) {
+      return createErrorResponse(`Failed to collect scene warnings: ${error?.message || 'Unknown error'}`);
     }
   }
 

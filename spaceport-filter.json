@@ -1,0 +1,14 @@
+{
+  "disabledTags": ["3d", "networking", "gdscript-only"],
+  "disabledTools": [
+    "create_project",
+    "list_projects",
+    "manage_docker_export",
+    "game_video",
+    "read_scene",
+    "game_serialize_state",
+    "export_project",
+    "manage_ci_pipeline",
+    "launch_editor"
+  ]
+}

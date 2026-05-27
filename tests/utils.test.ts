@@ -499,7 +499,7 @@ describe('parseGodotIni', () => {
       expect(removeGodotIniSectionLine(injected, 'autoload', 'McpInteractionServer')).toBe(original);
     });
 
-    it('removes injected blank lines around an autoload entry when other entries remain', () => {
+    it('preserves surrounding whitespace when other entries remain', () => {
       const content =
         `[autoload]\n` +
         `\n` +
@@ -508,8 +508,50 @@ describe('parseGodotIni', () => {
 
       expect(removeGodotIniSectionLine(content, 'autoload', 'McpInteractionServer')).toBe(
         `[autoload]\n` +
+          `\n` +
           `Globals="*res://globals.gd"\n`
       );
+    });
+
+    it('round-trips byte-for-byte against Godot formatting with other entries', () => {
+      // Godot keeps a blank line after each section header and before the next
+      // section. Injecting then removing the autoload must leave the file
+      // identical so there is no git churn.
+      const original =
+        `[application]\n` +
+        `\n` +
+        `config/name="Game"\n` +
+        `\n` +
+        `[autoload]\n` +
+        `\n` +
+        `Globals="*res://globals.gd"\n` +
+        `\n` +
+        `[rendering]\n` +
+        `\n` +
+        `renderer/rendering_method="gl_compatibility"\n`;
+
+      const injected = addGodotIniSectionLine(
+        original,
+        'autoload',
+        autoloadLine,
+        'McpInteractionServer'
+      );
+
+      expect(injected).toBe(
+        `[application]\n` +
+          `\n` +
+          `config/name="Game"\n` +
+          `\n` +
+          `[autoload]\n` +
+          `\n` +
+          `Globals="*res://globals.gd"\n` +
+          `${autoloadLine}\n` +
+          `\n` +
+          `[rendering]\n` +
+          `\n` +
+          `renderer/rendering_method="gl_compatibility"\n`
+      );
+      expect(removeGodotIniSectionLine(injected, 'autoload', 'McpInteractionServer')).toBe(original);
     });
 
     it('only removes matching keys from the target section', () => {

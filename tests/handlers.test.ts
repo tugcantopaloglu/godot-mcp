@@ -1932,8 +1932,8 @@ describe('Tool dispatch switch statement', () => {
   it('every case returns await this.handle*', () => {
     const caseRegex = /case '(\w+)':\s*\n\s*return await this\.handle/g;
     const matches = [...sourceCode.matchAll(caseRegex)];
-    // Should match all 155 tools
-    expect(matches.length).toBe(155);
+    // Should match all 156 tools
+    expect(matches.length).toBe(156);
   });
 
   it('no case falls through without return', () => {

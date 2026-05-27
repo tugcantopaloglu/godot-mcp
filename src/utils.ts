@@ -240,8 +240,24 @@ function getAllowedProjectRoots(): string[] {
 
 function normalizeScopedPath(path: string): string {
   if (!path) return '';
-  const wslPath = path.match(/^[A-Za-z]:[\\/]/) ? toWslProjectPath(path) : path;
-  return normalize(wslPath).replace(/\\/g, '/').replace(/\/+$/, '');
+  const wslPath = isWindowsAbsoluteDrivePath(path) ? toWslProjectPath(path) : path;
+  return stripTrailingForwardSlashes(normalize(wslPath).replaceAll('\\', '/'));
+}
+
+function isWindowsAbsoluteDrivePath(path: string): boolean {
+  if (path.length < 3 || path.charCodeAt(1) !== 58) return false;
+  const drive = path.charCodeAt(0);
+  const separator = path.charCodeAt(2);
+  const isDriveLetter = (drive >= 65 && drive <= 90) || (drive >= 97 && drive <= 122);
+  return isDriveLetter && (separator === 47 || separator === 92);
+}
+
+function stripTrailingForwardSlashes(path: string): string {
+  let end = path.length;
+  while (end > 0 && path.charCodeAt(end - 1) === 47) {
+    end--;
+  }
+  return end === path.length ? path : path.slice(0, end);
 }
 
 export function createErrorResponse(message: string): any {
@@ -330,9 +346,12 @@ export function addGodotIniSectionLine(content: string, section: string, line: s
       }
     }
 
-    let insertIndex = sectionIndex + 1;
-    while (insertIndex < lines.length && lines[insertIndex].trim() === '') {
-      lines.splice(insertIndex, 1);
+    // Append after the last existing entry, skipping back over trailing blank
+    // lines. This keeps Godot's blank line after the header intact so removal
+    // can splice just our line back out and round-trip byte-for-byte.
+    let insertIndex = sectionEnd;
+    while (insertIndex > sectionIndex + 1 && lines[insertIndex - 1].trim() === '') {
+      insertIndex--;
     }
     lines.splice(insertIndex, 0, line);
     return joinGodotIniLines(lines, newline, parsed.trailingNewline);
@@ -370,30 +389,29 @@ export function removeGodotIniSectionLine(content: string, section: string, key:
   }
 
   sectionEnd = findGodotIniSectionEnd(lines, sectionIndex + 1);
-  while (sectionIndex + 1 < sectionEnd && lines[sectionIndex + 1].trim() === '') {
-    lines.splice(sectionIndex + 1, 1);
-    sectionEnd = findGodotIniSectionEnd(lines, sectionIndex + 1);
-  }
-  while (sectionEnd - 1 > sectionIndex && lines[sectionEnd - 1].trim() === '') {
-    lines.splice(sectionEnd - 1, 1);
-    sectionEnd = findGodotIniSectionEnd(lines, sectionIndex + 1);
-  }
-
   const hasRemainingContent = lines
     .slice(sectionIndex + 1, sectionEnd)
     .some(sectionLine => sectionLine.trim() !== '');
-  if (!hasRemainingContent) {
-    lines.splice(sectionIndex, sectionEnd - sectionIndex);
-    if (sectionIndex === lines.length && lines.length > 0 && lines[lines.length - 1].trim() === '') {
-      lines.pop();
-    } else if (
-      sectionIndex > 0 &&
-      sectionIndex < lines.length &&
-      lines[sectionIndex - 1].trim() === '' &&
-      lines[sectionIndex].trim() === ''
-    ) {
-      lines.splice(sectionIndex, 1);
-    }
+
+  // Other entries remain: drop only the matched line(s) and leave the
+  // surrounding whitespace untouched, so Godot's blank line after the header
+  // and before the next section survive and the file round-trips unchanged.
+  if (hasRemainingContent) {
+    return joinGodotIniLines(lines, newline, parsed.trailingNewline && lines.length > 0);
+  }
+
+  // The section is now empty, meaning we injected it wholesale: remove the
+  // header and the separator blank line we added in front of it.
+  lines.splice(sectionIndex, sectionEnd - sectionIndex);
+  if (sectionIndex === lines.length && lines.length > 0 && lines[lines.length - 1].trim() === '') {
+    lines.pop();
+  } else if (
+    sectionIndex > 0 &&
+    sectionIndex < lines.length &&
+    lines[sectionIndex - 1].trim() === '' &&
+    lines[sectionIndex].trim() === ''
+  ) {
+    lines.splice(sectionIndex, 1);
   }
 
   return joinGodotIniLines(lines, newline, parsed.trailingNewline && lines.length > 0);
@@ -442,8 +460,11 @@ function godotIniLineMatchesKey(line: string, key: string): boolean {
   if (!trimmed || trimmed.startsWith(';')) {
     return false;
   }
-  const match = /^([^=]+)\s*=/.exec(trimmed);
-  return match?.[1].trim() === key;
+  const separatorIndex = trimmed.indexOf('=');
+  if (separatorIndex <= 0) {
+    return false;
+  }
+  return trimmed.slice(0, separatorIndex).trim() === key;
 }
 
 /**

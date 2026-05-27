@@ -89,6 +89,8 @@ func _init():
             manage_theme_resource(params)
         "manage_scene_structure":
             manage_scene_structure(params)
+        "get_scene_warnings":
+            get_scene_warnings(params)
         _:
             log_error("Unknown operation: " + operation)
             quit(1)
@@ -1434,6 +1436,69 @@ func _walk_scene_tree(node) -> Dictionary:
         info["children"] = children_arr
 
     return info
+
+# Read a scene file and collect editor configuration warnings per node
+func get_scene_warnings(params):
+    if not params.has("scene_path"):
+        printerr("scene_path is required")
+        quit(1)
+
+    var full_scene_path = params.scene_path
+    if not full_scene_path.begins_with("res://"):
+        full_scene_path = "res://" + full_scene_path
+
+    log_info("Collecting scene warnings: " + full_scene_path)
+
+    if not FileAccess.file_exists(full_scene_path):
+        printerr("Scene file does not exist at: " + full_scene_path)
+        quit(1)
+
+    var scene = load(full_scene_path)
+    if not scene:
+        printerr("Failed to load scene: " + full_scene_path)
+        quit(1)
+
+    var scene_root = scene.instantiate()
+    if scene_root == null:
+        printerr("Failed to instantiate scene: " + full_scene_path)
+        quit(1)
+
+    var warnings_list: Array = []
+    _collect_warnings_recursive(scene_root, scene_root, warnings_list)
+
+    print("WARNINGS_JSON_START")
+    print(JSON.stringify({
+        "scene_path": full_scene_path,
+        "root": scene_root.name,
+        "warnings": warnings_list,
+        "count": warnings_list.size(),
+    }))
+    print("WARNINGS_JSON_END")
+
+    scene_root.queue_free()
+
+func _collect_warnings_recursive(scene_root: Node, node: Node, results: Array) -> void:
+    var messages: Array = []
+    if node.has_method("_get_configuration_warnings"):
+        var raw: Variant = node.call("_get_configuration_warnings")
+        if raw is PackedStringArray:
+            for w in raw:
+                messages.append(str(w))
+        elif raw is Array:
+            for w in raw:
+                messages.append(str(w))
+
+    if messages.size() > 0:
+        var rel_path: String = "." if node == scene_root else String(scene_root.get_path_to(node))
+        results.append({
+            "path": rel_path,
+            "name": String(node.name),
+            "class": node.get_class(),
+            "messages": messages,
+        })
+
+    for child in node.get_children():
+        _collect_warnings_recursive(scene_root, child, results)
 
 # Modify a node's properties in a scene file
 func modify_node(params):
