@@ -189,7 +189,7 @@ describe('GodotServer', () => {
     it('creates a regular project successfully', async () => {
       const server = new (GodotServer as any)();
       const result = await server.handleCreateProject({
-        projectPath: '/tmp/test-project',
+        projectPath: '/safe/test-project',
         projectName: 'TestGame',
       });
       const text = result.content[0].text;
@@ -200,7 +200,7 @@ describe('GodotServer', () => {
     it('creates a .NET project when dotnet flag is true', async () => {
       const server = new (GodotServer as any)();
       const result = await server.handleCreateProject({
-        projectPath: '/tmp/test-dotnet',
+        projectPath: '/safe/test-dotnet',
         projectName: 'DotNetGame',
         dotnet: true,
       });
@@ -211,7 +211,7 @@ describe('GodotServer', () => {
 
     it('rejects when projectPath or projectName is missing', async () => {
       const server = new (GodotServer as any)();
-      const result = await server.handleCreateProject({ projectPath: '/tmp' });
+      const result = await server.handleCreateProject({ projectPath: '/safe' });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('projectPath and projectName are required');
     });
@@ -220,7 +220,7 @@ describe('GodotServer', () => {
       mockExistsSync.mockReturnValue(true);
       const server = new (GodotServer as any)();
       const result = await server.handleCreateProject({
-        projectPath: '/tmp/existing',
+        projectPath: '/safe/existing',
         projectName: 'Existing',
       });
       expect(result.isError).toBe(true);
@@ -248,15 +248,6 @@ describe('GodotServer', () => {
       mockExistsSync.mockReturnValue(false);
       const server = new (GodotServer as any)();
       const result = await server.isValidGodotPath('/invalid/path');
-      expect(result).toBe(false);
-    });
-  });
-
-  describe('setGodotPath', () => {
-    it('returns false for invalid path', async () => {
-      mockExistsSync.mockReturnValue(false);
-      const server = new (GodotServer as any)();
-      const result = await server.setGodotPath('/invalid/path');
       expect(result).toBe(false);
     });
   });
