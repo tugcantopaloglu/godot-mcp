@@ -261,42 +261,26 @@ describe('GodotServer', () => {
       expect(result.content[0].text).toContain('Not a valid Godot project');
     });
 
-    it('reads project info and includes isDotnet', async () => {
+    it.each`
+      scenario            | projectName  | featuresLine                                                                       | direntName           | expectedIsDotnet
+      ${'with .NET'}      | ${'TestGame'} | ${'config/features=PackedStringArray("4.3", "DotNet")\n'}                          | ${'TestGame.csproj'} | ${true}
+      ${'without .NET'}   | ${'MyGame'}   | ${''}                                                                              | ${'Main.gd'}         | ${false}
+    `('reads project info $scenario', async ({ projectName, featuresLine, direntName, expectedIsDotnet }) => {
       mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue(`
 [application]
-config/name="TestGame"
-config/features=PackedStringArray("4.3", "DotNet")
-      `);
-      // getProjectStructureAsync (Dirent-like) called first, then isDotnetProject (strings)
+config/name="${projectName}"
+${featuresLine}      `);
       mockReaddirSync
         .mockReturnValueOnce([
-          { name: 'TestGame.csproj', isDirectory: () => false, isFile: () => true },
+          { name: direntName, isDirectory: () => false, isFile: () => true },
         ])
-        .mockReturnValueOnce(['TestGame.csproj']);
+        .mockReturnValueOnce([direntName]);
       const server = new (GodotServer as any)();
       const result = await server.handleGetProjectInfo({ projectPath: '/fake' });
       const json = JSON.parse(result.content[0].text);
-      expect(json.name).toBe('TestGame');
-      expect(json.isDotnet).toBe(true);
-    });
-
-    it('reads project info without .NET', async () => {
-      mockExistsSync.mockReturnValue(true);
-      mockReadFileSync.mockReturnValue(`
-[application]
-config/name="MyGame"
-      `);
-      mockReaddirSync
-        .mockReturnValueOnce([
-          { name: 'Main.gd', isDirectory: () => false, isFile: () => true },
-        ])
-        .mockReturnValueOnce(['Main.gd']);
-      const server = new (GodotServer as any)();
-      const result = await server.handleGetProjectInfo({ projectPath: '/fake' });
-      const json = JSON.parse(result.content[0].text);
-      expect(json.name).toBe('MyGame');
-      expect(json.isDotnet).toBe(false);
+      expect(json.name).toBe(projectName);
+      expect(json.isDotnet).toBe(expectedIsDotnet);
     });
   });
 
