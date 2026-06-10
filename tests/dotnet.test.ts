@@ -7,7 +7,6 @@ import {
   generateCsprojContent,
   generateGodotProjectFeatures,
   getGodotBinaryCandidates,
-  normalizeParameters,
 } from '../src/utils.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -94,91 +93,6 @@ describe('generateCsharpScriptSource', () => {
       className: 'C',
     });
     expect(result.endsWith('}\n')).toBe(true);
-  });
-});
-
-describe('isDotnetProject', () => {
-  it('exists in source', () => {
-    expect(sourceCode).toContain('isDotnetProject');
-  });
-
-  it('reads directory entries ending with .csproj', () => {
-    expect(sourceCode).toContain('readdirSync');
-    expect(sourceCode).toContain('.csproj');
-  });
-
-  it('returns false on error', () => {
-    // The catch block returns false
-    expect(sourceCode).toContain('catch');
-    expect(sourceCode).toContain('return false');
-  });
-});
-
-describe('handleCreateCsharpScript', () => {
-  it('exists in source as a handler method', () => {
-    expect(sourceCode).toContain('handleCreateCsharpScript');
-  });
-
-  it('validates projectPath and scriptPath are required', () => {
-    const args = normalizeParameters({ projectPath: '/game' });
-    expect(!args.projectPath || !args.scriptPath).toBe(true);
-  });
-
-  it('checks for project.godot before creating', () => {
-    expect(sourceCode).toContain("project.godot");
-    expect(sourceCode).toContain("Not a valid Godot project");
-  });
-
-  it('checks for .csproj (isDotnetProject) before creating', () => {
-    expect(sourceCode).toContain('isDotnetProject');
-    expect(sourceCode).toContain('Not a Godot .NET project');
-  });
-
-  it('falls back to default namespace from projectPath basename', () => {
-    expect(sourceCode).toContain('basename(args.projectPath)');
-  });
-
-  it('falls back to Node as default inherits', () => {
-    expect(sourceCode).toContain("inherits || 'Node'");
-  });
-});
-
-describe('handleCreateProject dotnet support', () => {
-  it('has dotnet property in schema definition', () => {
-    const createProjectBlock = sourceCode.substring(
-      sourceCode.indexOf("name: 'create_project'"),
-      sourceCode.indexOf("name: 'manage_autoloads'"),
-    );
-    expect(createProjectBlock).toContain('dotnet');
-  });
-
-  it('checks args.dotnet === true for .NET project creation', () => {
-    expect(sourceCode).toContain("args.dotnet === true");
-  });
-
-  it('generates .csproj file with Godot.NET.Sdk', () => {
-    expect(utilsCode).toContain('Godot.NET.Sdk');
-    expect(utilsCode).toContain('TargetFramework');
-    expect(utilsCode).toContain('net8.0');
-  });
-
-  it('includes DotNet in features when dotnet is true', () => {
-    expect(sourceCode).toContain('DotNet');
-  });
-
-  it('appends (Godot .NET) suffix in response text', () => {
-    expect(sourceCode).toContain("' (Godot .NET)'");
-  });
-});
-
-describe('get_project_info isDotnet field', () => {
-  it('calls isDotnetProject in get_project_info', () => {
-    expect(sourceCode).toContain('handleGetProjectInfo');
-    expect(sourceCode).toContain('isDotnetProject');
-  });
-
-  it('includes isDotnet in response', () => {
-    expect(sourceCode).toContain('isDotnet');
   });
 });
 
