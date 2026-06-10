@@ -53,7 +53,7 @@ const ALL_TOOL_NAMES = [
   'game_animation_control', 'game_skeleton_ik', 'game_audio_effect',
   'game_audio_bus_layout', 'game_audio_spatial',
   // Batch 4: Editor/Headless + Localization + Resource
-  'rename_file', 'manage_resource', 'create_script', 'manage_scene_signals',
+  'rename_file', 'manage_resource', 'create_script', 'create_csharp_script', 'manage_scene_signals',
   'manage_layers', 'manage_plugins', 'manage_shader', 'manage_theme_resource',
   'set_main_scene', 'manage_scene_structure', 'manage_translations', 'game_locale',
   // Batch 5: UI Controls + Rendering + Resource Runtime
@@ -71,8 +71,8 @@ beforeAll(() => {
 });
 
 describe('Tool definitions', () => {
-  it('defines exactly 154 tools', () => {
-    expect(ALL_TOOL_NAMES).toHaveLength(154);
+  it('defines exactly 155 tools', () => {
+    expect(ALL_TOOL_NAMES).toHaveLength(155);
   });
 
   it('all tool names are unique', () => {

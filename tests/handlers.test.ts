@@ -744,6 +744,11 @@ describe('Handler required-parameter validation', () => {
     expect(!args.projectPath || !args.projectName).toBe(true);
   });
 
+  it('create_csharp_script requires projectPath and scriptPath', () => {
+    const args = normalizeParameters({ projectPath: '/game' });
+    expect(!args.projectPath || !args.scriptPath).toBe(true);
+  });
+
   it('manage_autoloads requires projectPath and action', () => {
     const args = normalizeParameters({ projectPath: '/game' });
     expect(!args.projectPath || !args.action).toBe(true);
@@ -998,7 +1003,8 @@ describe('Handler source structure', () => {
 
   it('all project management handlers exist', () => {
     const pmHandlers = [
-      'handleCreateProject', 'handleManageAutoloads',
+      'handleCreateProject', 'handleCreateCsharpScript',
+      'handleManageAutoloads',
       'handleManageInputMap', 'handleManageExportPresets',
     ];
     for (const h of pmHandlers) {
@@ -1932,8 +1938,8 @@ describe('Tool dispatch switch statement', () => {
   it('every case returns await this.handle*', () => {
     const caseRegex = /case '(\w+)':\s*\n\s*return await this\.handle/g;
     const matches = [...sourceCode.matchAll(caseRegex)];
-    // Should match all 154 tools
-    expect(matches.length).toBe(154);
+    // Should match all 155 tools
+    expect(matches.length).toBe(155);
   });
 
   it('no case falls through without return', () => {

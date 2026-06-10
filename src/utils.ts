@@ -232,3 +232,100 @@ export function isGodot44OrLater(version: string): boolean {
   }
   return false;
 }
+
+export interface CsharpScriptOptions {
+  namespace: string;
+  inherits: string;
+  className: string;
+  methods?: string[];
+}
+
+export function generateCsharpScriptSource(opts: CsharpScriptOptions): string {
+  const lines: string[] = [
+    'using Godot;',
+    'using System;',
+    '',
+    `namespace ${opts.namespace};`,
+    '',
+    `public partial class ${opts.className} : ${opts.inherits}`,
+    '{',
+  ];
+  const methods = opts.methods && opts.methods.length > 0 ? opts.methods : ['_Ready'];
+  for (const m of methods) {
+    lines.push(`    public override void ${m}()`);
+    lines.push('    {');
+    lines.push('        // TODO: Implement');
+    lines.push('    }');
+    lines.push('');
+  }
+  lines.push('}');
+  return lines.join('\n') + '\n';
+}
+
+export function generateCsprojContent(projectName: string): string {
+  const safeName = projectName.replace(/[^a-zA-Z0-9_]/g, '_');
+  return `<Project Sdk="Godot.NET.Sdk/4.3.0">\n  <PropertyGroup>\n    <TargetFramework>net8.0</TargetFramework>\n    <RootNamespace>${safeName}</RootNamespace>\n    <Nullable>enable</Nullable>\n  </PropertyGroup>\n</Project>\n`;
+}
+
+export function generateGodotProjectFeatures(isDotnet: boolean): string {
+  return isDotnet ? 'PackedStringArray("4.3", "DotNet")' : 'PackedStringArray("4.3")';
+}
+
+export function getGodotBinaryCandidates(
+  platform: string,
+  homeDir?: string,
+  userProfile?: string,
+): string[] {
+  const paths: string[] = ['godot'];
+  if (platform === 'darwin') {
+    paths.push(
+      '/Applications/Godot.app/Contents/MacOS/Godot',
+      '/Applications/Godot_4.app/Contents/MacOS/Godot',
+      '/Applications/Godot_mono.app/Contents/MacOS/Godot',
+      '/Applications/Godot_4_mono.app/Contents/MacOS/Godot',
+    );
+    if (homeDir) {
+      paths.push(
+        `${homeDir}/Applications/Godot.app/Contents/MacOS/Godot`,
+        `${homeDir}/Applications/Godot_4.app/Contents/MacOS/Godot`,
+        `${homeDir}/Applications/Godot_mono.app/Contents/MacOS/Godot`,
+        `${homeDir}/Applications/Godot_4_mono.app/Contents/MacOS/Godot`,
+        `${homeDir}/Library/Application Support/Steam/steamapps/common/Godot Engine/Godot.app/Contents/MacOS/Godot`,
+      );
+    }
+  } else if (platform === 'win32') {
+    paths.push(
+      'C:\\Program Files\\Godot\\Godot.exe',
+      'C:\\Program Files\\Godot\\Godot_mono.exe',
+      'C:\\Program Files (x86)\\Godot\\Godot.exe',
+      'C:\\Program Files (x86)\\Godot\\Godot_mono.exe',
+      'C:\\Program Files\\Godot_4\\Godot.exe',
+      'C:\\Program Files\\Godot_4\\Godot_mono.exe',
+      'C:\\Program Files (x86)\\Godot_4\\Godot.exe',
+      'C:\\Program Files (x86)\\Godot_4\\Godot_mono.exe',
+      'C:\\Program Files\\Godot_mono\\Godot.exe',
+      'C:\\Program Files\\Godot_4_mono\\Godot.exe',
+    );
+    if (userProfile) {
+      paths.push(
+        `${userProfile}\\Godot\\Godot.exe`,
+        `${userProfile}\\Godot\\Godot_mono.exe`,
+      );
+    }
+  } else if (platform === 'linux') {
+    paths.push(
+      '/usr/bin/godot',
+      '/usr/bin/godot-mono',
+      '/usr/local/bin/godot',
+      '/usr/local/bin/godot-mono',
+      '/snap/bin/godot',
+    );
+    if (homeDir) {
+      paths.push(
+        `${homeDir}/.local/bin/godot`,
+        `${homeDir}/.local/bin/godot-mono`,
+      );
+    }
+  }
+  return paths;
+}

@@ -8,6 +8,7 @@
     "ai",
     "claude",
     "cline",
+    "opencode",
     "game-engine",
     "gdscript",
     "runtime",
@@ -40,7 +41,8 @@
     "prepare": "npm run build",
     "watch": "tsc --watch",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.26.0",

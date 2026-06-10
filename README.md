@@ -8,7 +8,7 @@
 [![](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white 'TypeScript')](https://www.typescriptlang.org/)
 [![](https://img.shields.io/badge/License-MIT-red.svg 'MIT License')](https://opensource.org/licenses/MIT)
 
-A comprehensive [Model Context Protocol](https://modelcontextprotocol.io/introduction) (MCP) server that gives AI assistants **full control** over the Godot game engine. **149 tools** spanning networking, 3D/2D rendering, UI controls, audio effects, animation trees, file I/O, runtime code execution, property inspection, scene manipulation, signal management, physics, project creation, and more.
+A comprehensive [Model Context Protocol](https://modelcontextprotocol.io/introduction) (MCP) server that gives AI assistants **full control** over the Godot game engine. **150 tools** spanning networking, 3D/2D rendering, UI controls, audio effects, animation trees, file I/O, runtime code execution, property inspection, scene manipulation, signal management, physics, project creation, and more.
 
 ## Acknowledgments
 
@@ -16,7 +16,7 @@ This project is built upon and extends [godot-mcp](https://github.com/Coding-Sol
 
 ## What's New (Improvements Over Original)
 
-The original godot-mcp provided 20 tools for basic project management and scene creation. This fork extends it to **149 tools** with the following major additions:
+The original godot-mcp provided 20 tools for basic project management and scene creation. This fork extends it to **150 tools** with the following major additions:
 
 ### Runtime Code Execution
 - **`game_eval`** - Execute arbitrary GDScript code in the running game with return values
@@ -75,7 +75,8 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 - **`game_gamepad`** - Gamepad button and axis input events
 
 ### Project Creation & Configuration
-- **`create_project`** - Create a new Godot project from scratch
+- **`create_project`** - Create a new Godot project from scratch (supports `dotnet: true` for .NET projects)
+- **`create_csharp_script`** - Create a C# script file (requires .NET project)
 - **`manage_autoloads`** - Add, remove, or list autoloads
 - **`manage_input_map`** - Add, remove, or list input actions and key bindings
 - **`manage_export_presets`** - Create or modify export preset configuration
@@ -194,7 +195,7 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 - **PackedArray serialization** - Proper JSON arrays instead of string fallback
 - **Graceful error handling** - Scene read fallback to raw .tscn text on missing dependencies
 
-## All 149 Tools
+## All 150 Tools
 
 ### Project Management (7 tools)
 | Tool | Description |
@@ -315,7 +316,7 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `game_input_state` | Query pressed keys, mouse position, connected pads |
 | `game_input_action` | Manage runtime InputMap actions and strength |
 
-### Project Creation (4 tools)
+### Project Creation (5 tools)
 | Tool | Description |
 |------|-------------|
 | `create_project` | Create a new Godot project from scratch |
@@ -415,12 +416,19 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `game_audio_bus_layout` | Create/remove/reorder audio buses and routing |
 | `game_audio_spatial` | Configure AudioStreamPlayer3D spatial properties |
 
+### .NET / C# Support (2 tools)
+| Tool | Description |
+|------|-------------|
+| `create_csharp_script` | Create a C# script file in a Godot .NET project |
+| `create_project` | Now supports `dotnet: true` for .NET project scaffolding |
+
 ### Editor & Project Tools (12 tools)
 | Tool | Description |
 |------|-------------|
 | `rename_file` | Rename or move a file within the project |
 | `manage_resource` | Read or modify .tres/.res resource files |
 | `create_script` | Create a GDScript file from a template |
+| `create_csharp_script` | Create a C# script file in a Godot .NET project |
 | `manage_scene_signals` | List/add/remove signal connections in .tscn files |
 | `manage_layers` | List/set named layer definitions in project |
 | `manage_plugins` | List/enable/disable editor plugins |
@@ -453,7 +461,8 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 
 - [Godot Engine](https://godotengine.org/download) (4.x recommended, 4.4+ for UID features)
 - [Node.js](https://nodejs.org/) >= 18.0.0
-- An AI assistant that supports MCP (Claude Code, Cline, Cursor, etc.)
+- An AI assistant that supports MCP (Claude Code, Cline, Cursor, OpenCode, etc.)
+- (Optional) [.NET SDK](https://dotnet.microsoft.com/download) and Godot .NET for C# development
 
 ## Installation
 
@@ -501,6 +510,34 @@ Add to your Cline MCP settings (`cline_mcp_settings.json`):
 }
 ```
 
+### OpenCode
+
+Add to your project's `opencode.json` (or create one at the project root):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "godot": {
+      "type": "local",
+      "command": ["npx", "-y", "@tugcantopaloglu/godot-mcp"],
+      "enabled": true,
+      "environment": {
+        "GODOT_PATH": "/path/to/godot"
+      }
+    }
+  }
+}
+```
+
+For local development (cloned repo), use the build directly:
+
+```json
+{
+  "command": ["node", "/absolute/path/to/godot-mcp/build/index.js"]
+}
+```
+
 ### Cursor
 
 Create `.cursor/mcp.json` in your project:
@@ -525,6 +562,52 @@ To use the `game_*` runtime tools, your Godot project needs the MCP interaction 
 3. Add the script with the name `McpInteractionServer`
 
 The server listens on `127.0.0.1:9090` and accepts JSON commands over TCP when the game is running.
+
+## .NET / C# Support
+
+The server provides first-class support for Godot .NET (C#) projects.
+
+### Detecting .NET Projects
+
+The `get_project_info` tool automatically detects .NET projects by checking for `.csproj` files and returns an `isDotnet` field:
+
+```json
+{
+  "name": "MyGame",
+  "path": "/path/to/project",
+  "godotVersion": "4.3.stable",
+  "isDotnet": true,
+  "structure": { ... }
+}
+```
+
+### Creating a .NET Project
+
+Use `create_project` with the `dotnet: true` flag to scaffold a .NET Godot project:
+
+```
+Create a new Godot .NET project called "MyRpgGame" with dotnet: true
+```
+
+This generates:
+- `project.godot` with the `DotNet` feature flag
+- A `.csproj` file targeting `net8.0` with the `Godot.NET.Sdk/4.3.0`
+
+### Creating C# Scripts
+
+Use the `create_csharp_script` tool to create C# script files:
+
+```json
+{
+  "projectPath": "/path/to/project",
+  "scriptPath": "scripts/Player.cs",
+  "inherits": "CharacterBody3D",
+  "namespace": "MyRpgGame",
+  "methods": ["_Ready", "_Process", "_PhysicsProcess"]
+}
+```
+
+The tool validates that the project is a .NET project (has `.csproj`) before creating the script.
 
 ## Environment Variables
 
@@ -558,13 +641,15 @@ The project uses [Vitest](https://vitest.dev/) with 390 tests across 3 files:
 | File | Tests | What it covers |
 |------|-------|----------------|
 | `tests/utils.test.ts` | 31 | Parameter mappings, normalization, path validation, error responses, version detection |
-| `tests/tool-definitions.test.ts` | 157 | All 149 tools defined, schemas valid, names unique, descriptions < 80 chars |
-| `tests/handlers.test.ts` | 202 | Game command arg transforms, required-param validation, headless op path checks, source structure |
+| `tests/tool-definitions.test.ts` | 163 | All 150 tools defined, schemas valid, names unique, descriptions < 80 chars |
+| `tests/handlers.test.ts` | 226 | Game command arg transforms, required-param validation, headless op path checks, source structure |
+| `tests/dotnet.test.ts` | 27 | .NET detection, C# script template generation, handler validation, tool definitions |
+| `tests/server.test.ts` | 24 | GodotServer class integration tests with mocked fs/child_process/net |
 
 ```bash
-npm test          # run once
-npm run test:watch  # watch mode
-```
+npm test             # run once
+npm run test:watch   # watch mode
+npm run test:coverage  # with coverage (index.ts: 8%, utils.ts: 100%)
 
 ## Example Prompts
 
@@ -611,4 +696,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Credits
 
 - **Original project**: [godot-mcp](https://github.com/Coding-Solo/godot-mcp) by [Solomon Elias (Coding-Solo)](https://github.com/Coding-Solo) - provided the foundational MCP server architecture, headless operations system, and TCP interaction framework
-- **Extended by**: [Tugcan Topaloglu](https://github.com/tugcantopaloglu) - extended to 149 tools covering networking, 3D/2D rendering, UI controls, audio effects, animation trees, file I/O, runtime code execution, node manipulation, signals, project creation, camera control, physics, and comprehensive type conversion
+- **Extended by**: [Tugcan Topaloglu](https://github.com/tugcantopaloglu) - extended to 150 tools covering networking, 3D/2D rendering, UI controls, audio effects, animation trees, file I/O, runtime code execution, node manipulation, signals, project creation, camera control, physics, and comprehensive type conversion

@@ -31,6 +31,10 @@ import {
   validatePath,
   createErrorResponse,
   isGodot44OrLater,
+  generateCsharpScriptSource,
+  generateCsprojContent,
+  generateGodotProjectFeatures,
+  getGodotBinaryCandidates,
   type OperationParams,
 } from './utils.js';
 
@@ -246,35 +250,11 @@ class GodotServer {
     const osPlatform = process.platform;
     this.logDebug(`Auto-detecting Godot path for platform: ${osPlatform}`);
 
-    const possiblePaths: string[] = [
-      'godot', // Check if 'godot' is in PATH first
-    ];
-
-    // Add platform-specific paths
-    if (osPlatform === 'darwin') {
-      possiblePaths.push(
-        '/Applications/Godot.app/Contents/MacOS/Godot',
-        '/Applications/Godot_4.app/Contents/MacOS/Godot',
-        `${process.env.HOME}/Applications/Godot.app/Contents/MacOS/Godot`,
-        `${process.env.HOME}/Applications/Godot_4.app/Contents/MacOS/Godot`,
-        `${process.env.HOME}/Library/Application Support/Steam/steamapps/common/Godot Engine/Godot.app/Contents/MacOS/Godot`
-      );
-    } else if (osPlatform === 'win32') {
-      possiblePaths.push(
-        'C:\\Program Files\\Godot\\Godot.exe',
-        'C:\\Program Files (x86)\\Godot\\Godot.exe',
-        'C:\\Program Files\\Godot_4\\Godot.exe',
-        'C:\\Program Files (x86)\\Godot_4\\Godot.exe',
-        `${process.env.USERPROFILE}\\Godot\\Godot.exe`
-      );
-    } else if (osPlatform === 'linux') {
-      possiblePaths.push(
-        '/usr/bin/godot',
-        '/usr/local/bin/godot',
-        '/snap/bin/godot',
-        `${process.env.HOME}/.local/bin/godot`
-      );
-    }
+    const possiblePaths = getGodotBinaryCandidates(
+      osPlatform,
+      process.env.HOME,
+      process.env.USERPROFILE,
+    );
 
     // Try each possible path
     for (const path of possiblePaths) {
@@ -762,6 +742,18 @@ class GodotServer {
     }
 
     return projects;
+  }
+
+  /**
+   * Check if a Godot project is a .NET (C#) project by looking for .csproj files
+   */
+  private isDotnetProject(projectPath: string): boolean {
+    try {
+      const entries = readdirSync(projectPath);
+      return entries.some(e => e.endsWith('.csproj'));
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -1703,19 +1695,20 @@ class GodotServer {
         },
         // Project management tools
         {
-          name: 'create_project',
-          description: 'Create a new Godot project from scratch',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              projectPath: { type: 'string', description: 'Directory where the project will be created' },
-              projectName: { type: 'string', description: 'Name of the project' },
+            name: 'create_project',
+            description: 'Create a new Godot project from scratch',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                projectPath: { type: 'string', description: 'Directory where the project will be created' },
+                projectName: { type: 'string', description: 'Name of the project' },
+                dotnet: { type: 'boolean', description: 'Create .NET (C#) project with .csproj and DotNet feature flag. Default: false' },
+              },
+              required: ['projectPath', 'projectName'],
             },
-            required: ['projectPath', 'projectName'],
           },
-        },
-        {
-          name: 'manage_autoloads',
+          {
+            name: 'manage_autoloads',
           description: 'Add, remove, or list autoloads in a Godot project',
           inputSchema: {
             type: 'object',
@@ -2814,6 +2807,41 @@ class GodotServer {
           },
         },
         {
+          name: 'create_csharp_script',
+          description: 'Create a C# script file in a Godot .NET project',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Godot project path',
+              },
+              scriptPath: {
+                type: 'string',
+                description: 'Script file path (relative to project, e.g. "scripts/Player.cs")',
+              },
+              namespace: {
+                type: 'string',
+                description: 'Optional namespace. Defaults to project name',
+              },
+              inherits: {
+                type: 'string',
+                description: 'Base class to inherit from. Default: Node',
+              },
+              methods: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Optional method stubs to include',
+              },
+              source: {
+                type: 'string',
+                description: 'Full source code (overrides template)',
+              },
+            },
+            required: ['projectPath', 'scriptPath'],
+          },
+        },
+        {
           name: 'manage_scene_signals',
           description: 'List/add/remove signal connections in .tscn files',
           inputSchema: {
@@ -3471,6 +3499,8 @@ class GodotServer {
           return await this.handleManageResource(request.params.arguments);
         case 'create_script':
           return await this.handleCreateScript(request.params.arguments);
+        case 'create_csharp_script':
+          return await this.handleCreateCsharpScript(request.params.arguments);
         case 'manage_scene_signals':
           return await this.handleManageSceneSignals(request.params.arguments);
         case 'manage_layers':
@@ -3964,6 +3994,7 @@ class GodotServer {
   
       // Extract project name from project.godot file
       let projectName = basename(args.projectPath);
+      const isDotnet = this.isDotnetProject(args.projectPath);
       try {
         const projectFileContent = readFileSync(projectFile, 'utf8');
         const configNameMatch = projectFileContent.match(/config\/name="([^"]+)"/);
@@ -3975,7 +4006,7 @@ class GodotServer {
         this.logDebug(`Error reading project file: ${error}`);
         // Continue with default project name if extraction fails
       }
-  
+
       return {
         content: [
           {
@@ -3985,6 +4016,7 @@ class GodotServer {
                 name: projectName,
                 path: args.projectPath,
                 godotVersion: stdout.trim(),
+                isDotnet,
                 structure: projectStructure,
               },
               null,
@@ -5081,9 +5113,19 @@ class GodotServer {
       const projectFile = join(args.projectPath, 'project.godot');
       if (existsSync(projectFile))
         return createErrorResponse('A project.godot already exists at this path.');
-      const content = `; Engine configuration file.\n; Generated by Godot MCP.\n\nconfig_version=5\n\n[application]\n\nconfig/name="${args.projectName}"\nconfig/features=PackedStringArray("4.3")\n`;
+
+      const isDotnet = args.dotnet === true;
+      const features = generateGodotProjectFeatures(isDotnet);
+      const content = `; Engine configuration file.\n; Generated by Godot MCP.\n\nconfig_version=5\n\n[application]\n\nconfig/name="${args.projectName}"\nconfig/features=${features}\n`;
       writeFileSync(projectFile, content, 'utf8');
-      return { content: [{ type: 'text', text: `Project "${args.projectName}" created at ${args.projectPath}` }] };
+
+      if (isDotnet) {
+        const csprojContent = generateCsprojContent(args.projectName);
+        const safeName = args.projectName.replace(/[^a-zA-Z0-9_]/g, '_');
+        writeFileSync(join(args.projectPath, `${safeName}.csproj`), csprojContent, 'utf8');
+      }
+
+      return { content: [{ type: 'text', text: `Project "${args.projectName}" created at ${args.projectPath}${isDotnet ? ' (Godot .NET)' : ''}` }] };
     } catch (error: any) {
       return createErrorResponse(`Failed to create project: ${error?.message || 'Unknown error'}`);
     }
@@ -6112,6 +6154,36 @@ class GodotServer {
     }
   }
 
+  private async handleCreateCsharpScript(args: any) {
+    args = normalizeParameters(args || {});
+    if (!args.projectPath || !args.scriptPath) return createErrorResponse('projectPath and scriptPath are required.');
+    if (!validatePath(args.projectPath) || !validatePath(args.scriptPath)) return createErrorResponse('Invalid path.');
+    const projectFile = join(args.projectPath, 'project.godot');
+    if (!existsSync(projectFile)) return createErrorResponse(`Not a valid Godot project: ${args.projectPath}`);
+    if (!this.isDotnetProject(args.projectPath)) return createErrorResponse('Not a Godot .NET project. Create a .csproj file first or use create_project with dotnet: true.');
+    try {
+      const fullPath = join(args.projectPath, args.scriptPath);
+      const dir = dirname(fullPath);
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      let source = args.source;
+      if (!source) {
+        const ns = args.namespace || basename(args.projectPath).replace(/[^a-zA-Z0-9_]/g, '_');
+        const inherits = args.inherits || 'Node';
+        const className = basename(args.scriptPath, '.cs');
+        source = generateCsharpScriptSource({
+          namespace: ns,
+          inherits,
+          className,
+          methods: args.methods,
+        });
+      }
+      writeFileSync(fullPath, source, 'utf8');
+      return { content: [{ type: 'text', text: `C# script created at ${args.scriptPath}` }] };
+    } catch (error: any) {
+      return createErrorResponse(`create_csharp_script failed: ${error?.message || 'Unknown error'}`);
+    }
+  }
+
   private async handleManageSceneSignals(args: any) {
     args = normalizeParameters(args || {});
     if (!args.projectPath || !args.scenePath || !args.action) return createErrorResponse('projectPath, scenePath, and action are required.');
@@ -6679,10 +6751,14 @@ class GodotServer {
   }
 }
 
-// Create and run the server
-const server = new GodotServer();
-server.run().catch((error: unknown) => {
-  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-  console.error('Failed to run server:', errorMessage);
-  process.exit(1);
-});
+// Prevent auto-start during vitest so the class can be imported for testing
+if (!process.env.VITEST) {
+  const server = new GodotServer();
+  server.run().catch((error: unknown) => {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Failed to run server:', errorMessage);
+    process.exit(1);
+  });
+}
+
+export { GodotServer };
