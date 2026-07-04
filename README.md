@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/tugcantopaloglu-godot-mcp-badge.png)](https://mseep.ai/app/tugcantopaloglu-godot-mcp)
+
 
 <img width="2752" height="1536" alt="godot_mcp_header" src="https://github.com/user-attachments/assets/ed7ac605-8fb5-4a5f-adf8-4b6912cbc18c" />
 
