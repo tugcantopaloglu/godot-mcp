@@ -24,6 +24,16 @@ describe('syncVersions', () => {
     );
   });
 
+  it('uses top-level await for the CLI entry point', async () => {
+    const source = await readFile(
+      fileURLToPath(new URL('../scripts/sync-version.js', import.meta.url)),
+      'utf8'
+    );
+
+    expect(source).toContain('await syncVersions();');
+    expect(source).not.toContain('syncVersions().catch');
+  });
+
   it('keeps the repository release manifests in sync', async () => {
     const root = fileURLToPath(new URL('..', import.meta.url));
     const packageJson = await readJson(root, 'package.json');

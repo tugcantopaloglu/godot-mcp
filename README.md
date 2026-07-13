@@ -579,7 +579,7 @@ The server uses two communication channels:
 
 ## Testing
 
-The project uses [Vitest](https://vitest.dev/) with 456 tests across 6 files:
+The project uses [Vitest](https://vitest.dev/) with 457 tests across 6 files:
 
 | File | Tests | What it covers |
 |------|-------|----------------|
@@ -588,7 +588,7 @@ The project uses [Vitest](https://vitest.dev/) with 456 tests across 6 files:
 | `tests/handlers.test.ts` | 225 | Game command arg transforms, required-param validation, headless op path checks, source structure |
 | `tests/dotnet.test.ts` | 20 | .NET feature flag, .csproj generation, C# script template generation, identifier validation |
 | `tests/validate-script.test.ts` | 12 | GDScript diagnostic parsing + git-changed file collection |
-| `tests/version-sync.test.ts` | 3 | Release version synchronization across package and MCP registry manifests |
+| `tests/version-sync.test.ts` | 4 | Release version synchronization across package and MCP registry manifests |
 
 ```bash
 npm test          # run once

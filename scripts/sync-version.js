@@ -37,8 +37,10 @@ export async function syncVersions(rootDir = process.cwd()) {
 const invokedPath = process.argv[1] && path.resolve(process.argv[1]);
 
 if (invokedPath === fileURLToPath(import.meta.url)) {
-  syncVersions().catch((error) => {
+  try {
+    await syncVersions();
+  } catch (error) {
     console.error(error);
     process.exitCode = 1;
-  });
+  }
 }
