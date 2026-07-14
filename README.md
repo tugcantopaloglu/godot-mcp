@@ -8,7 +8,7 @@
 [![](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white 'TypeScript')](https://www.typescriptlang.org/)
 [![](https://img.shields.io/badge/License-MIT-red.svg 'MIT License')](https://opensource.org/licenses/MIT)
 
-A comprehensive [Model Context Protocol](https://modelcontextprotocol.io/introduction) (MCP) server that gives AI assistants **full control** over the Godot game engine. **157 tools** spanning networking, 3D/2D rendering, UI controls, audio effects, animation trees, file I/O, runtime code execution, property inspection, scene manipulation, signal management, physics, project creation, and more.
+A comprehensive [Model Context Protocol](https://modelcontextprotocol.io/introduction) (MCP) server that gives AI assistants **full control** over the Godot game engine. It exposes **157 operations** spanning networking, 3D/2D rendering, UI controls, audio effects, animation trees, file I/O, runtime code execution, property inspection, scene manipulation, signal management, physics, project creation, and more.
 
 ## Acknowledgments
 
@@ -16,7 +16,7 @@ This project is built upon and extends [godot-mcp](https://github.com/Coding-Sol
 
 ## What's New (Improvements Over Original)
 
-The original godot-mcp provided 20 tools for basic project management and scene creation. This fork extends it to **157 tools** with the following major additions:
+The original godot-mcp provided 20 tools for basic project management and scene creation. This fork extends that capability set to **157 operations**, now exposed through a compact public tool tree:
 
 ### New in 3.1
 - **`validate_script` autoload resolution** - Script validation now compiles the target through a `SceneTree` at `_initialize()` (after project autoloads are registered) instead of `--check-only` at `_init()`. References to autoload singletons no longer produce false `Identifier not found` errors, while real syntax/type errors are still caught. Verified building a full game whose scripts reference several autoloads.
@@ -25,7 +25,7 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 ### New in 3.0
 - **.NET / C# support** - Scaffold C# projects and generate C# scripts (`create_project` with `dotnet: true`, `create_csharp_script`); the `.csproj` SDK version is matched to your installed Godot.
 - **GDScript diagnostics** - Validate scripts for syntax and type errors without running the game (`validate_script`, and `validate_scripts` for all git-changed or project-wide files).
-- **Correctness and robustness fixes** across the headless scene operations and the runtime interaction server (resource-typed properties now persist, reparenting works, runtime commands are correlated by request id, and the tools survive projects with warnings-as-errors). Requires Godot 4.4 or later; tested and working with the latest Godot **4.7**.
+- **Correctness and robustness fixes** across the headless scene operations and the runtime interaction server (resource-typed properties now persist, reparenting works, runtime commands are correlated by request id, and the operations survive projects with warnings-as-errors). Requires Godot 4.4 or later; tested and working with the latest Godot **4.7**.
 
 ### Runtime Code Execution
 - **`game_eval`** - Execute arbitrary GDScript code in the running game with return values
@@ -215,10 +215,37 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 - **PackedArray serialization** - Proper JSON arrays instead of string fallback
 - **Graceful error handling** - Scene read fallback to raw .tscn text on missing dependencies
 
-## All 157 Tools
+## Public tool tree
 
-### Project Management (7 tools)
-| Tool | Description |
+To avoid overwhelming MCP clients and agents with 157 top-level tools, the server now exposes **19 public tools**:
+
+- `godot_catalog` lists the tree, or returns operation descriptions and input schemas for one requested domain.
+- Eighteen `<domain>_manage` tools accept `{ "op": "<operation>", "params": { ... } }`.
+
+Start by calling `godot_catalog`. Then call the matching branch. For example, the former top-level call:
+
+```text
+validate_script({ "projectPath": "C:/games/my-game", "scriptPath": "res://player.gd" })
+```
+
+becomes a call to `validation_manage` with these arguments:
+
+```json
+{
+  "op": "validate_script",
+  "params": {
+    "projectPath": "C:/games/my-game",
+    "scriptPath": "res://player.gd"
+  }
+}
+```
+
+The branches are: `core`, `project`, `scene`, `filesystem`, `validation`, `runtime`, `node`, `input`, `signal`, `animation`, `camera`, `physics`, `render_2d`, `render_3d`, `audio`, `ui`, `network`, and `system`. The 157 operation names below remain the compatibility reference; they are values of `op`, not MCP tool names.
+
+## All 157 operations
+
+### Project Management (7 operations)
+| Operation | Description |
 |------|-------------|
 | `launch_editor` | Launch Godot editor for a project |
 | `run_project` | Run a Godot project and capture output |
@@ -228,8 +255,8 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `list_projects` | Find Godot projects in a directory |
 | `get_project_info` | Get project metadata |
 
-### Scene Management (7 tools)
-| Tool | Description |
+### Scene Management (7 operations)
+| Operation | Description |
 |------|-------------|
 | `create_scene` | Create a new scene with a root node type |
 | `add_node` | Add a node to an existing scene |
@@ -239,8 +266,8 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `get_uid` | Get UID for a file (Godot 4.4+) |
 | `update_project_uids` | Resave resources to update UIDs |
 
-### Headless Scene Operations (5 tools)
-| Tool | Description |
+### Headless Scene Operations (5 operations)
+| Operation | Description |
 |------|-------------|
 | `read_scene` | Read full scene tree as JSON |
 | `modify_scene_node` | Modify node properties in a scene file |
@@ -248,35 +275,35 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `attach_script` | Attach a GDScript to a scene node |
 | `create_resource` | Create a .tres resource file |
 
-### Project Settings (3 tools)
-| Tool | Description |
+### Project Settings (3 operations)
+| Operation | Description |
 |------|-------------|
 | `read_project_settings` | Parse project.godot as JSON |
 | `modify_project_settings` | Change a project setting |
 | `list_project_files` | List/filter project files |
 
-### Runtime Input (4 tools)
-| Tool | Description |
+### Runtime Input (4 operations)
+| Operation | Description |
 |------|-------------|
 | `game_screenshot` | Capture a screenshot (base64 PNG) |
 | `game_click` | Click at a position |
 | `game_key_press` | Send key press or input action |
 | `game_mouse_move` | Move the mouse |
 
-### Runtime Inspection (3 tools)
-| Tool | Description |
+### Runtime Inspection (3 operations)
+| Operation | Description |
 |------|-------------|
 | `game_get_ui` | Get all visible UI elements |
 | `game_get_scene_tree` | Get full scene tree structure |
 | `game_get_node_info` | Detailed node introspection |
 
-### Runtime Code Execution (1 tool)
-| Tool | Description |
+### Runtime Code Execution (1 operation)
+| Operation | Description |
 |------|-------------|
 | `game_eval` | Execute arbitrary GDScript with return values |
 
-### Runtime Node Manipulation (7 tools)
-| Tool | Description |
+### Runtime Node Manipulation (7 operations)
+| Operation | Description |
 |------|-------------|
 | `game_get_property` | Get any node property |
 | `game_set_property` | Set any node property (auto type conversion) |
@@ -286,8 +313,8 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `game_change_scene` | Switch to a different scene |
 | `game_reparent_node` | Move a node to a new parent |
 
-### Runtime Signals (5 tools)
-| Tool | Description |
+### Runtime Signals (5 operations)
+| Operation | Description |
 |------|-------------|
 | `game_connect_signal` | Connect a signal to a method |
 | `game_disconnect_signal` | Disconnect a signal |
@@ -295,14 +322,14 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `game_list_signals` | List all signals on a node with connections |
 | `game_await_signal` | Await a signal with timeout and return args |
 
-### Runtime Animation (2 tools)
-| Tool | Description |
+### Runtime Animation (2 operations)
+| Operation | Description |
 |------|-------------|
 | `game_play_animation` | Control AnimationPlayer |
 | `game_tween_property` | Tween a property with easing |
 
-### Runtime Utilities (5 tools)
-| Tool | Description |
+### Runtime Utilities (5 operations)
+| Operation | Description |
 |------|-------------|
 | `game_pause` | Pause/unpause the game |
 | `game_performance` | Get FPS, memory, draw calls |
@@ -310,22 +337,22 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `game_get_nodes_in_group` | Query nodes by group |
 | `game_find_nodes_by_class` | Find nodes by class type |
 
-### File I/O (4 tools)
-| Tool | Description |
+### File I/O (4 operations)
+| Operation | Description |
 |------|-------------|
 | `read_file` | Read a text file from a Godot project |
 | `write_file` | Create or overwrite a text file |
 | `delete_file` | Delete a file from a project |
 | `create_directory` | Create a directory inside a project |
 
-### Error & Log Capture (2 tools)
-| Tool | Description |
+### Error & Log Capture (2 operations)
+| Operation | Description |
 |------|-------------|
 | `game_get_errors` | Get new errors/warnings since last call |
 | `game_get_logs` | Get new print output since last call |
 
-### Enhanced Input (8 tools)
-| Tool | Description |
+### Enhanced Input (8 operations)
+| Operation | Description |
 |------|-------------|
 | `game_key_hold` | Hold a key down (no auto-release) |
 | `game_key_release` | Release a held key |
@@ -336,8 +363,8 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `game_input_state` | Query pressed keys, mouse position, connected pads |
 | `game_input_action` | Manage runtime InputMap actions and strength |
 
-### Project Creation (5 tools)
-| Tool | Description |
+### Project Creation (5 operations)
+| Operation | Description |
 |------|-------------|
 | `create_project` | Create a new Godot project (supports `dotnet: true` for C#) |
 | `create_csharp_script` | Create a C# script in a Godot .NET project |
@@ -345,8 +372,8 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `manage_input_map` | Add, remove, or list input actions |
 | `manage_export_presets` | Create or modify export presets |
 
-### Advanced Runtime (24 tools)
-| Tool | Description |
+### Advanced Runtime (24 operations)
+| Operation | Description |
 |------|-------------|
 | `game_get_camera` | Get active camera position/rotation/zoom |
 | `game_set_camera` | Move or rotate the active camera |
@@ -372,21 +399,21 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `game_viewport` | Create or configure a SubViewport node |
 | `game_debug_draw` | Draw debug lines, spheres, or boxes in 3D |
 
-### Build & Export (1 tool)
-| Tool | Description |
+### Build & Export (1 operation)
+| Operation | Description |
 |------|-------------|
 | `export_project` | Export a Godot project using a preset |
 
-### Networking (4 tools)
-| Tool | Description |
+### Networking (4 operations)
+| Operation | Description |
 |------|-------------|
 | `game_http_request` | HTTP GET/POST/PUT/DELETE with headers and body |
 | `game_websocket` | WebSocket client connect/disconnect/send messages |
 | `game_multiplayer` | ENet multiplayer create server/client/disconnect |
 | `game_rpc` | Call or configure RPC methods on nodes |
 
-### System & Window (6 tools)
-| Tool | Description |
+### System & Window (6 operations)
+| Operation | Description |
 |------|-------------|
 | `game_script` | Attach, detach, or get source of node scripts |
 | `game_window` | Get/set window size, fullscreen, title, position |
@@ -395,8 +422,8 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `game_process_mode` | Set node process mode (pausable/always/disabled) |
 | `game_world_settings` | Get/set gravity, physics FPS, and world settings |
 
-### 3D Rendering & Geometry (13 tools)
-| Tool | Description |
+### 3D Rendering & Geometry (13 operations)
+| Operation | Description |
 |------|-------------|
 | `game_csg` | Create/configure CSG nodes with boolean operations |
 | `game_multimesh` | Create/configure MultiMeshInstance3D for instancing |
@@ -412,8 +439,8 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `game_navigation_3d` | Create/configure NavigationRegion3D and bake |
 | `game_physics_3d` | Area3D queries and point/shape intersection tests |
 
-### 2D Systems (7 tools)
-| Tool | Description |
+### 2D Systems (7 operations)
+| Operation | Description |
 |------|-------------|
 | `game_canvas` | Create/configure CanvasLayer and CanvasModulate |
 | `game_canvas_draw` | 2D drawing: line/rect/circle/polygon/text/clear |
@@ -423,22 +450,22 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `game_path_2d` | Path2D/Curve2D management and AnimatedSprite2D |
 | `game_physics_2d` | Area2D queries and 2D point/shape intersections |
 
-### Advanced Animation (3 tools)
-| Tool | Description |
+### Advanced Animation (3 operations)
+| Operation | Description |
 |------|-------------|
 | `game_animation_tree` | AnimationTree state machine travel and params |
 | `game_animation_control` | AnimationPlayer seek/queue/speed/info control |
 | `game_skeleton_ik` | SkeletonIK3D start/stop/set target position |
 
-### Advanced Audio (3 tools)
-| Tool | Description |
+### Advanced Audio (3 operations)
+| Operation | Description |
 |------|-------------|
 | `game_audio_effect` | Add/remove/configure audio bus effects |
 | `game_audio_bus_layout` | Create/remove/reorder audio buses and routing |
 | `game_audio_spatial` | Configure AudioStreamPlayer3D spatial properties |
 
-### Editor & Project Tools (14 tools)
-| Tool | Description |
+### Editor & Project Operations (14 operations)
+| Operation | Description |
 |------|-------------|
 | `rename_file` | Rename or move a file within the project |
 | `manage_resource` | Read or modify .tres/.res resource files |
@@ -455,8 +482,8 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `manage_translations` | List/add/remove translation files in project |
 | `game_locale` | Set/get locale and translate strings at runtime |
 
-### UI Controls (8 tools)
-| Tool | Description |
+### UI Controls (8 operations)
+| Operation | Description |
 |------|-------------|
 | `game_ui_control` | Set focus, anchors, tooltip, mouse filter on Control |
 | `game_ui_text` | LineEdit/TextEdit/RichTextLabel text operations |
@@ -467,8 +494,8 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 | `game_ui_menu` | PopupMenu/MenuBar: add/remove/get menu items |
 | `game_ui_range` | ProgressBar/Slider/SpinBox/ColorPicker get/set |
 
-### Rendering & Resources (2 tools)
-| Tool | Description |
+### Rendering & Resources (2 operations)
+| Operation | Description |
 |------|-------------|
 | `game_render_settings` | Get/set MSAA, FXAA, TAA, scaling mode/scale |
 | `game_resource` | Runtime resource load, save, or preload |
@@ -541,9 +568,9 @@ Create `.cursor/mcp.json` in your project:
 }
 ```
 
-## Runtime Tools Setup
+## Runtime Operations Setup
 
-To use the `game_*` runtime tools, your Godot project needs the MCP interaction server autoload. Copy `build/scripts/mcp_interaction_server.gd` to your project and register it as an autoload:
+To use the `game_*` runtime operations, your Godot project needs the MCP interaction server autoload. Copy `build/scripts/mcp_interaction_server.gd` to your project and register it as an autoload:
 
 1. Copy `build/scripts/mcp_interaction_server.gd` to your project's scripts folder
 2. In Godot: **Project > Project Settings > Autoload**
@@ -571,7 +598,7 @@ The server uses two communication channels:
 
 | Path | Description |
 |------|-------------|
-| `src/index.ts` | MCP server, tool definitions, and all handlers |
+| `src/index.ts` | MCP server, public tool tree, operation schemas, and handlers |
 | `src/utils.ts` | Pure utility functions (parameter mapping, validation, error helpers) |
 | `src/scripts/godot_operations.gd` | Headless GDScript operations runner |
 | `src/scripts/mcp_interaction_server.gd` | TCP interaction server autoload |
@@ -579,12 +606,12 @@ The server uses two communication channels:
 
 ## Testing
 
-The project uses [Vitest](https://vitest.dev/) with 446 tests across 5 files:
+The project uses [Vitest](https://vitest.dev/) with 455 tests across 5 files:
 
 | File | Tests | What it covers |
 |------|-------|----------------|
 | `tests/utils.test.ts` | 31 | Parameter mappings, normalization, path validation, error responses, version detection |
-| `tests/tool-definitions.test.ts` | 163 | All 155 tools defined, schemas valid, names unique, descriptions < 80 chars |
+| `tests/tool-definitions.test.ts` | 167 | All 157 operations mapped once, 19 public tools, schemas valid |
 | `tests/handlers.test.ts` | 225 | Game command arg transforms, required-param validation, headless op path checks, source structure |
 | `tests/dotnet.test.ts` | 20 | .NET feature flag, .csproj generation, C# script template generation, identifier validation |
 | `tests/validate-script.test.ts` | 12 | GDScript diagnostic parsing + git-changed file collection |
@@ -645,4 +672,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Credits
 
 - **Original project**: [godot-mcp](https://github.com/Coding-Solo/godot-mcp) by [Solomon Elias (Coding-Solo)](https://github.com/Coding-Solo) - provided the foundational MCP server architecture, headless operations system, and TCP interaction framework
-- **Extended by**: [Tugcan Topaloglu](https://github.com/tugcantopaloglu) - extended to 157 tools covering networking, 3D/2D rendering, UI controls, audio effects, animation trees, file I/O, runtime code execution, node manipulation, signals, project creation, camera control, physics, and comprehensive type conversion
+- **Extended by**: [Tugcan Topaloglu](https://github.com/tugcantopaloglu) - extended to 157 operations covering networking, 3D/2D rendering, UI controls, audio effects, animation trees, file I/O, runtime code execution, node manipulation, signals, project creation, camera control, physics, and comprehensive type conversion
