@@ -8,7 +8,7 @@
 [![](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white 'TypeScript')](https://www.typescriptlang.org/)
 [![](https://img.shields.io/badge/License-MIT-red.svg 'MIT License')](https://opensource.org/licenses/MIT)
 
-A comprehensive [Model Context Protocol](https://modelcontextprotocol.io/introduction) (MCP) server that gives AI assistants **full control** over the Godot game engine. **157 tools** spanning networking, 3D/2D rendering, UI controls, audio effects, animation trees, file I/O, runtime code execution, property inspection, scene manipulation, signal management, physics, project creation, and more.
+A comprehensive [Model Context Protocol](https://modelcontextprotocol.io/introduction) (MCP) server that gives AI assistants **full control** over the Godot game engine. It exposes **157 operations** spanning networking, 3D/2D rendering, UI controls, audio effects, animation trees, file I/O, runtime code execution, property inspection, scene manipulation, signal management, physics, project creation, and more.
 
 ## Acknowledgments
 
@@ -215,7 +215,28 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 - **PackedArray serialization** - Proper JSON arrays instead of string fallback
 - **Graceful error handling** - Scene read fallback to raw .tscn text on missing dependencies
 
-## All 157 Tools
+## Public tool tree
+
+To avoid overwhelming MCP clients and agents with 157 top-level tools, the server now exposes **19 public tools**:
+
+- `godot_catalog` lists the tree, or the operations in one requested domain.
+- Eighteen `<domain>_manage` tools accept `{ "op": "<operation>", "params": { ... } }`.
+
+Start by calling `godot_catalog`. Then call the matching branch, for example:
+
+```json
+{
+  "op": "validate_script",
+  "params": {
+    "projectPath": "C:/games/my-game",
+    "scriptPath": "res://player.gd"
+  }
+}
+```
+
+The branches are: `core`, `project`, `scene`, `filesystem`, `validation`, `runtime`, `node`, `input`, `signal`, `animation`, `camera`, `physics`, `render_2d`, `render_3d`, `audio`, `ui`, `network`, and `system`. The 157 operation names below remain the compatibility reference; they are values of `op`, not MCP tool names.
+
+## All 157 operations
 
 ### Project Management (7 tools)
 | Tool | Description |

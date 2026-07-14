@@ -23,6 +23,27 @@ import {
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
 
+const TOOL_TREE: Record<string, string[]> = {
+  core: ['launch_editor', 'run_project', 'get_debug_output', 'stop_project', 'get_godot_version', 'list_projects', 'get_project_info'],
+  project: ['create_project', 'create_csharp_script', 'read_project_settings', 'modify_project_settings', 'list_project_files', 'manage_autoloads', 'manage_input_map', 'manage_export_presets', 'export_project', 'manage_layers', 'manage_plugins', 'set_main_scene', 'manage_ci_pipeline', 'manage_docker_export'],
+  scene: ['create_scene', 'add_node', 'load_sprite', 'export_mesh_library', 'save_scene', 'get_uid', 'update_project_uids', 'read_scene', 'modify_scene_node', 'remove_scene_node', 'attach_script', 'create_resource', 'manage_scene_signals', 'manage_scene_structure'],
+  filesystem: ['read_file', 'write_file', 'delete_file', 'create_directory', 'rename_file', 'manage_resource', 'create_script', 'manage_shader', 'manage_theme_resource', 'manage_translations'],
+  validation: ['validate_script', 'validate_scripts'],
+  runtime: ['game_screenshot', 'game_click', 'game_key_press', 'game_mouse_move', 'game_get_ui', 'game_get_scene_tree', 'game_eval', 'game_pause', 'game_performance', 'game_wait', 'game_get_errors', 'game_get_logs', 'game_serialize_state', 'game_resource'],
+  node: ['game_get_property', 'game_set_property', 'game_call_method', 'game_get_node_info', 'game_instantiate_scene', 'game_remove_node', 'game_change_scene', 'game_reparent_node', 'game_get_nodes_in_group', 'game_find_nodes_by_class', 'game_spawn_node', 'game_manage_group', 'game_create_timer', 'game_script', 'game_process_mode'],
+  input: ['game_key_hold', 'game_key_release', 'game_scroll', 'game_mouse_drag', 'game_gamepad', 'game_touch', 'game_input_state', 'game_input_action'],
+  signal: ['game_connect_signal', 'game_disconnect_signal', 'game_emit_signal', 'game_list_signals', 'game_await_signal'],
+  animation: ['game_play_animation', 'game_tween_property', 'game_create_animation', 'game_animation_tree', 'game_animation_control', 'game_skeleton_ik', 'game_bone_pose'],
+  camera: ['game_get_camera', 'game_set_camera', 'game_camera_attributes', 'game_viewport'],
+  physics: ['game_raycast', 'game_add_collision', 'game_physics_body', 'game_create_joint', 'game_physics_2d', 'game_physics_3d', 'game_navigation_3d', 'game_navigate_path'],
+  render_2d: ['game_canvas', 'game_canvas_draw', 'game_light_2d', 'game_parallax', 'game_shape_2d', 'game_path_2d', 'game_tilemap', 'game_terrain'],
+  render_3d: ['game_csg', 'game_multimesh', 'game_procedural_mesh', 'game_light_3d', 'game_mesh_instance', 'game_gridmap', 'game_3d_effects', 'game_gi', 'game_path_3d', 'game_sky', 'game_set_shader_param', 'game_set_particles', 'game_environment', 'game_visual_shader', 'game_render_settings', 'game_debug_draw'],
+  audio: ['game_get_audio', 'game_audio_play', 'game_audio_bus', 'game_audio_effect', 'game_audio_bus_layout', 'game_audio_spatial'],
+  ui: ['game_ui_theme', 'game_ui_control', 'game_ui_text', 'game_ui_popup', 'game_ui_tree', 'game_ui_item_list', 'game_ui_tabs', 'game_ui_menu', 'game_ui_range'],
+  network: ['game_http_request', 'game_websocket', 'game_multiplayer', 'game_rpc'],
+  system: ['game_window', 'game_os_info', 'game_time_scale', 'game_world_settings', 'game_locale', 'game_video'],
+};
+
 import {
   PARAMETER_MAPPINGS,
   REVERSE_PARAMETER_MAPPINGS,
@@ -823,10 +844,66 @@ class GodotServer {
   /**
    * Set up the tool handlers for the MCP server
    */
+  private buildGroupedTools(legacyTools: any[]) {
+    return [
+      {
+        name: 'godot_catalog',
+        description: 'Browse the Godot MCP operation tree before choosing a domain tool',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            domain: { type: 'string', enum: Object.keys(TOOL_TREE), description: 'Optional domain to inspect' },
+          },
+        },
+      },
+      ...Object.entries(TOOL_TREE).map(([domain, operations]) => ({
+        name: `${domain}_manage`,
+        description: `Godot ${domain} operations. Call godot_catalog for the operation tree.`,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            op: { type: 'string', enum: operations, description: `Operation in the ${domain} branch` },
+            params: {
+              type: 'object',
+              description: 'Parameters for the selected operation',
+              additionalProperties: true,
+            },
+          },
+          required: ['op', 'params'],
+        },
+      })),
+    ];
+  }
+
+  private getCatalog(domain?: unknown) {
+    if (domain !== undefined && (typeof domain !== 'string' || !(domain in TOOL_TREE))) {
+      return createErrorResponse(`Unknown domain: ${String(domain)}`);
+    }
+
+    const tree = domain ? { [domain]: TOOL_TREE[domain as string] } : TOOL_TREE;
+    return {
+      content: [{ type: 'text', text: JSON.stringify(tree, null, 2) }],
+    };
+  }
+
+  private resolveGroupedTool(name: string, args: unknown) {
+    const domain = name.endsWith('_manage') ? name.slice(0, -'_manage'.length) : undefined;
+    if (!domain || !(domain in TOOL_TREE)) return undefined;
+
+    const groupedArgs = args as { op?: unknown; params?: unknown } | undefined;
+    if (!groupedArgs || typeof groupedArgs.op !== 'string' || !TOOL_TREE[domain].includes(groupedArgs.op)) {
+      return undefined;
+    }
+    if (groupedArgs.params === undefined || groupedArgs.params === null || typeof groupedArgs.params !== 'object' || Array.isArray(groupedArgs.params)) {
+      return undefined;
+    }
+
+    return { operation: groupedArgs.op, params: groupedArgs.params as Record<string, unknown> };
+  }
+
   private setupToolHandlers() {
-    // Define available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: [
+    // Keep each operation's schema internally, but expose a compact domain tree to MCP clients.
+    const legacyTools = [
         {
           name: 'launch_editor',
           description: 'Launch Godot editor for a specific project',
@@ -3304,11 +3381,27 @@ class GodotServer {
             required: ['projectPath', 'action'],
           },
         },
-      ],
+      ];
+
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: this.buildGroupedTools(legacyTools),
     }));
 
     // Handle tool calls
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      if (request.params.name === 'godot_catalog') {
+        return this.getCatalog(request.params.arguments?.domain);
+      }
+
+      const resolved = this.resolveGroupedTool(request.params.name, request.params.arguments);
+      if (!resolved) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Use godot_catalog, then call <domain>_manage with a valid op and params object.'
+        );
+      }
+      request.params.name = resolved.operation;
+      request.params.arguments = resolved.params;
       this.logDebug(`Handling tool request: ${request.params.name}`);
       switch (request.params.name) {
         case 'launch_editor':

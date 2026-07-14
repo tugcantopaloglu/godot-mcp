@@ -71,7 +71,7 @@ beforeAll(() => {
 });
 
 describe('Tool definitions', () => {
-  it('defines exactly 157 tools', () => {
+  it('keeps exactly 157 internal operations', () => {
     expect(ALL_TOOL_NAMES).toHaveLength(157);
   });
 
@@ -111,6 +111,25 @@ describe('Tool definitions', () => {
     for (const name of ALL_TOOL_NAMES) {
       expect(sourceCode).toContain(`case '${name}':`);
     }
+  });
+
+  it('maps every operation to exactly one branch of the public tool tree', () => {
+    const treeMatch = sourceCode.match(/const TOOL_TREE:[\s\S]*?\n\};/);
+    expect(treeMatch).toBeTruthy();
+
+    const treeOperations = [...treeMatch![0].matchAll(/'([a-z][a-z0-9_]*)'/g)].map(match => match[1]);
+    expect(treeOperations).toHaveLength(ALL_TOOL_NAMES.length);
+    expect(new Set(treeOperations).size).toBe(treeOperations.length);
+    expect([...treeOperations].sort()).toEqual([...ALL_TOOL_NAMES].sort());
+  });
+
+  it('publishes one catalog plus 18 domain tools instead of 157 public tools', () => {
+    const treeMatch = sourceCode.match(/const TOOL_TREE:[\s\S]*?\n\};/);
+    const domains = [...treeMatch![0].matchAll(/^\s{2}([a-z0-9_]+): \[/gm)].map(match => match[1]);
+    expect(domains).toHaveLength(18);
+    expect(sourceCode).toContain("name: 'godot_catalog'");
+    expect(sourceCode).toContain('...Object.entries(TOOL_TREE).map');
+    expect(sourceCode).toContain('tools: this.buildGroupedTools(legacyTools)');
   });
 
   it('no tool description exceeds 80 characters', () => {
