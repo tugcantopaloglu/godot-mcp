@@ -129,6 +129,7 @@ class GodotServer {
   private interactionScriptPath: string;
   private validateScriptPath: string;
   private validatedPaths: Map<string, boolean> = new Map();
+  private operationCatalog: Map<string, any> = new Map();
   private strictPathValidation: boolean = false;
   private gameConnection: GameConnection = {
     socket: null,
@@ -880,7 +881,25 @@ class GodotServer {
       return createErrorResponse(`Unknown domain: ${String(domain)}`);
     }
 
-    const tree = domain ? { [domain]: TOOL_TREE[domain as string] } : TOOL_TREE;
+    const tree = domain
+      ? {
+          domain,
+          operations: TOOL_TREE[domain as string].map(operation => {
+            const definition = this.operationCatalog.get(operation);
+            return {
+              name: operation,
+              description: definition?.description,
+              inputSchema: definition?.inputSchema,
+            };
+          }),
+        }
+      : {
+          domains: Object.entries(TOOL_TREE).map(([name, operations]) => ({
+            name,
+            tool: `${name}_manage`,
+            operationCount: operations.length,
+          })),
+        };
     return {
       content: [{ type: 'text', text: JSON.stringify(tree, null, 2) }],
     };
@@ -3382,6 +3401,8 @@ class GodotServer {
           },
         },
       ];
+
+    this.operationCatalog = new Map(legacyTools.map(tool => [tool.name, tool]));
 
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: this.buildGroupedTools(legacyTools),

@@ -130,6 +130,7 @@ describe('Tool definitions', () => {
     expect(sourceCode).toContain("name: 'godot_catalog'");
     expect(sourceCode).toContain('...Object.entries(TOOL_TREE).map');
     expect(sourceCode).toContain('tools: this.buildGroupedTools(legacyTools)');
+    expect(sourceCode).toContain('inputSchema: definition?.inputSchema');
   });
 
   it('no tool description exceeds 80 characters', () => {

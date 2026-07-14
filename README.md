@@ -219,7 +219,7 @@ The original godot-mcp provided 20 tools for basic project management and scene 
 
 To avoid overwhelming MCP clients and agents with 157 top-level tools, the server now exposes **19 public tools**:
 
-- `godot_catalog` lists the tree, or the operations in one requested domain.
+- `godot_catalog` lists the tree, or returns operation descriptions and input schemas for one requested domain.
 - Eighteen `<domain>_manage` tools accept `{ "op": "<operation>", "params": { ... } }`.
 
 Start by calling `godot_catalog`. Then call the matching branch. For example, the former top-level call:
