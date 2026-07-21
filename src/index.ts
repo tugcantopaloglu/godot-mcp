@@ -13,6 +13,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync, copyFileSync, unl
 import { spawn, execFile } from 'child_process';
 import { promisify } from 'util';
 import { createConnection, Socket } from 'net';
+import { tmpdir } from 'os';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -120,8 +121,10 @@ class GodotServer {
   private nextRequestId: number = 1;
   private lastErrorIndex: number = 0;
   private lastLogIndex: number = 0;
-  private readonly INTERACTION_PORT = 9090;
   private readonly AUTOLOAD_NAME = 'McpInteractionServer';
+  // Each running game's autoload binds an OS-assigned port (avoiding collisions between
+  // concurrent Godot instances) and publishes it here, keyed by its own process id.
+  private readonly PORT_DISCOVERY_DIR = join(tmpdir(), 'godot-mcp-ports');
 
   constructor(config?: GodotServerConfig) {
     // Apply configuration if provided
@@ -438,9 +441,42 @@ class GodotServer {
   }
 
   /**
-   * Connect to the game's TCP interaction server with retries
+   * Path to the discovery file a game process with the given pid publishes its
+   * interaction server port to
    */
-  private async connectToGame(projectPath: string): Promise<void> {
+  private discoveryFilePath(pid: number): string {
+    return join(this.PORT_DISCOVERY_DIR, `${pid}.json`);
+  }
+
+  /**
+   * Read the interaction server port a game process has published, if any
+   */
+  private readDiscoveredPort(pid: number): number | null {
+    try {
+      const parsed = JSON.parse(readFileSync(this.discoveryFilePath(pid), 'utf8'));
+      return typeof parsed.port === 'number' ? parsed.port : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Remove a game process's discovery file, if it still exists
+   */
+  private cleanupDiscoveryFile(pid: number): void {
+    try {
+      unlinkSync(this.discoveryFilePath(pid));
+    } catch {
+      // Already removed by the game process itself, or never created.
+    }
+  }
+
+  /**
+   * Connect to the game's TCP interaction server with retries
+   * @param pid Process id of the spawned Godot instance, used to look up its
+   *   OS-assigned interaction server port from its discovery file
+   */
+  private async connectToGame(projectPath: string, pid: number): Promise<void> {
     this.gameConnection.projectPath = projectPath;
 
     // Initial delay to let the game start up
@@ -455,15 +491,22 @@ class GodotServer {
         return;
       }
 
+      const discoveredPort = this.readDiscoveredPort(pid);
+      if (discoveredPort === null) {
+        this.logDebug(`Interaction server port not yet discovered for pid ${pid} (attempt ${attempt}/${maxAttempts})`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        continue;
+      }
+
       try {
         await new Promise<void>((resolve, reject) => {
-          const socket = createConnection({ host: '127.0.0.1', port: this.INTERACTION_PORT }, () => {
+          const socket = createConnection({ host: '127.0.0.1', port: discoveredPort }, () => {
             this.gameConnection.socket = socket;
             this.gameConnection.connected = true;
             this.gameConnection.responseBuffer = '';
             this.gameConnection.pendingRequests.clear();
             this.logDebug(`Connected to game interaction server (attempt ${attempt})`);
-            console.error(`[SERVER] Connected to game interaction server on port ${this.INTERACTION_PORT}`);
+            console.error(`[SERVER] Connected to game interaction server on port ${discoveredPort}`);
 
             socket.on('data', (data: Buffer) => {
               this.gameConnection.responseBuffer += data.toString();
@@ -3758,6 +3801,9 @@ class GodotServer {
         if (this.gameConnection.projectPath) {
           this.removeInteractionServer(this.gameConnection.projectPath);
         }
+        if (this.activeProcess.process.pid) {
+          this.cleanupDiscoveryFile(this.activeProcess.process.pid);
+        }
         this.activeProcess.process.kill();
       }
 
@@ -3798,6 +3844,9 @@ class GodotServer {
           this.removeInteractionServer(this.gameConnection.projectPath);
           this.gameConnection.projectPath = null;
         }
+        if (process.pid) {
+          this.cleanupDiscoveryFile(process.pid);
+        }
         if (this.activeProcess && this.activeProcess.process === process) {
           this.activeProcess = null;
         }
@@ -3812,8 +3861,12 @@ class GodotServer {
 
       this.activeProcess = { process, output, errors };
 
+      if (!process.pid) {
+        return createErrorResponse('Failed to run Godot project: spawned process has no pid.');
+      }
+
       // Start async TCP connection to the interaction server (fire-and-forget)
-      this.connectToGame(args.projectPath).catch(err => {
+      this.connectToGame(args.projectPath, process.pid).catch(err => {
         this.logDebug(`Failed to connect to game interaction server: ${err}`);
       });
 
@@ -3821,7 +3874,7 @@ class GodotServer {
         content: [
           {
             type: 'text',
-            text: `Godot project started in debug mode. Use get_debug_output to see output. Game interaction server connecting on port ${this.INTERACTION_PORT}...`,
+            text: `Godot project started in debug mode. Use get_debug_output to see output. Connecting to game interaction server...`,
           },
         ],
       };

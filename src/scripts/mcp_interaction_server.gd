@@ -10,7 +10,6 @@ var _buffer: String = ""
 var _busy: bool = false
 var _busy_since: float = 0.0
 var _current_id: Variant = null
-const PORT: int = 9090
 const BUSY_TIMEOUT: float = 120.0
 var _key_map: Dictionary
 var _held_keys: Dictionary = {}
@@ -20,11 +19,47 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_init_key_map()
 	_server = TCPServer.new()
-	var err: int = _server.listen(PORT, "127.0.0.1")
+	# Bind to an OS-assigned port so concurrent Godot instances never collide;
+	# the MCP client discovers the actual port via a PID-keyed file (see _write_discovery_file).
+	var err: int = _server.listen(0, "127.0.0.1")
 	if err != OK:
-		push_error("McpInteractionServer: Failed to listen on port %d, error: %d" % [PORT, err])
+		push_error("McpInteractionServer: Failed to listen on an OS-assigned port, error: %d" % err)
 		return
-	print("McpInteractionServer: Listening on 127.0.0.1:%d" % PORT)
+	var bound_port: int = _server.get_local_port()
+	_write_discovery_file(bound_port)
+	print("McpInteractionServer: Listening on 127.0.0.1:%d" % bound_port)
+
+
+# --- MCP client discovery ---
+func _discovery_dir() -> String:
+	return OS.get_temp_dir().path_join("godot-mcp-ports")
+
+
+func _discovery_file_path() -> String:
+	return _discovery_dir().path_join("%d.json" % OS.get_process_id())
+
+
+func _write_discovery_file(port: int) -> void:
+	var dir_path: String = _discovery_dir()
+	var dir_err: int = DirAccess.make_dir_recursive_absolute(dir_path)
+	if dir_err != OK:
+		push_error("McpInteractionServer: Failed to create discovery directory %s, error: %d" % [dir_path, dir_err])
+		return
+	var file: FileAccess = FileAccess.open(_discovery_file_path(), FileAccess.WRITE)
+	if file == null:
+		push_error("McpInteractionServer: Failed to write discovery file, error: %d" % FileAccess.get_open_error())
+		return
+	var payload: Dictionary = {
+		"port": port,
+		"project_path": ProjectSettings.globalize_path("res://"),
+	}
+	file.store_string(JSON.stringify(payload))
+
+
+func _delete_discovery_file() -> void:
+	var path: String = _discovery_file_path()
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(path)
 
 
 func _process(_delta: float) -> void:
@@ -4858,4 +4893,5 @@ func _exit_tree() -> void:
 	if _server != null:
 		_server.stop()
 		_server = null
+	_delete_discovery_file()
 	print("McpInteractionServer: Stopped")
