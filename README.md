@@ -3,6 +3,8 @@
 
 # Godot MCP - Full Control
 
+[![MCP Toplist](https://mcptoplist.com/badge/io.github.tugcantopaloglu%2Fgodot-mcp.svg)](https://mcptoplist.com/server/io.github.tugcantopaloglu%2Fgodot-mcp)
+
 [![](https://badge.mcpx.dev?type=server 'MCP Server')](https://modelcontextprotocol.io/introduction)
 [![Made with Godot](https://img.shields.io/badge/Made%20with-Godot-478CBF?style=flat&logo=godot%20engine&logoColor=white)](https://godotengine.org)
 [![](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white 'TypeScript')](https://www.typescriptlang.org/)
