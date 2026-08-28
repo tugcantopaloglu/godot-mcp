@@ -371,7 +371,9 @@ class GodotServer {
     const destScript = join(projectPath, 'mcp_interaction_server.gd');
 
     const existingContent = readFileSync(projectFile, 'utf8');
-    if (existingContent.includes(this.AUTOLOAD_NAME)) {
+    const autoloadLine = `${this.AUTOLOAD_NAME}="*res://mcp_interaction_server.gd"`;
+
+    if (existingContent.includes(autoloadLine)) {
       this.gameConnection.interactionServerInjectedByUs = false;
       if (!existsSync(destScript)) {
         copyFileSync(this.interactionScriptPath, destScript);
@@ -382,14 +384,19 @@ class GodotServer {
       return;
     }
 
+    if (existingContent.includes(this.AUTOLOAD_NAME)) {
+      // A different autoload with the same name exists; leave it and its script untouched
+      this.gameConnection.interactionServerInjectedByUs = false;
+      this.logDebug(`Autoload name ${this.AUTOLOAD_NAME} is bound to a different script; leaving project untouched`);
+      return;
+    }
+
     this.gameConnection.interactionServerInjectedByUs = true;
 
     copyFileSync(this.interactionScriptPath, destScript);
     this.logDebug(`Copied interaction server script to ${destScript}`);
 
     let content = existingContent;
-
-    const autoloadLine = `${this.AUTOLOAD_NAME}="*res://mcp_interaction_server.gd"`;
 
     if (content.includes('[autoload]')) {
       // Add after existing [autoload] section header
