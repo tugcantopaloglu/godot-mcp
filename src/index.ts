@@ -5447,12 +5447,18 @@ class GodotServer {
           return { content: [{ type: 'text', text: JSON.stringify({ presets: [] }, null, 2) }] };
         const content = readFileSync(presetsFile, 'utf8');
         const presets: Array<{ name: string; platform: string }> = [];
-        const nameMatches = content.matchAll(/name="([^"]+)"/g);
-        const platformMatches = content.matchAll(/platform="([^"]+)"/g);
-        const names = [...nameMatches].map(m => m[1]);
-        const platforms = [...platformMatches].map(m => m[1]);
-        for (let i = 0; i < names.length; i++) {
-          presets.push({ name: names[i], platform: platforms[i] || 'unknown' });
+        // Split on the [preset.N] headers and read each section's own keys.
+        // Matching /name="..."/ across the whole file also catches the option
+        // keys package/name, package/unique_name and version/name, and pairing
+        // two independent match lists then misaligns names with platforms.
+        const sections = content.split(/^\[preset\.\d+\]\s*$/m).slice(1);
+        for (const section of sections) {
+          // Stop at [preset.N.options], whose keys are not the preset's own.
+          const head = section.split(/^\[/m)[0];
+          const name = head.match(/^name="([^"]*)"/m);
+          const platform = head.match(/^platform="([^"]*)"/m);
+          if (!name) continue;
+          presets.push({ name: name[1], platform: platform ? platform[1] : 'unknown' });
         }
         return { content: [{ type: 'text', text: JSON.stringify({ presets }, null, 2) }] };
       } else if (args.action === 'add') {
