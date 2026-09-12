@@ -579,20 +579,27 @@ The server uses two communication channels:
 
 ## Testing
 
-The project uses [Vitest](https://vitest.dev/) with 446 tests across 5 files:
+The project uses [Vitest](https://vitest.dev/) with 457 tests across 6 files:
 
 | File | Tests | What it covers |
 |------|-------|----------------|
 | `tests/utils.test.ts` | 31 | Parameter mappings, normalization, path validation, error responses, version detection |
-| `tests/tool-definitions.test.ts` | 163 | All 155 tools defined, schemas valid, names unique, descriptions < 80 chars |
+| `tests/tool-definitions.test.ts` | 165 | All tools defined, schemas valid, names unique, descriptions < 80 chars |
 | `tests/handlers.test.ts` | 225 | Game command arg transforms, required-param validation, headless op path checks, source structure |
 | `tests/dotnet.test.ts` | 20 | .NET feature flag, .csproj generation, C# script template generation, identifier validation |
 | `tests/validate-script.test.ts` | 12 | GDScript diagnostic parsing + git-changed file collection |
+| `tests/version-sync.test.ts` | 4 | Release version synchronization across package and MCP registry manifests |
 
 ```bash
 npm test          # run once
 npm run test:watch  # watch mode
 ```
+
+### Release versions
+
+Use `npm version <version>` before creating a tag or GitHub release. The `version`
+lifecycle keeps `package-lock.json` and `server.json` synchronized with
+`package.json` and stages the generated manifest changes for the release commit.
 
 ## Example Prompts
 

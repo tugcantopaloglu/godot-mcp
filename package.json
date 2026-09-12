@@ -38,6 +38,7 @@
     "build": "tsc && node scripts/build.js",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
     "prepare": "npm run build",
+    "version": "node scripts/sync-version.js && git add package-lock.json server.json",
     "watch": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest"
